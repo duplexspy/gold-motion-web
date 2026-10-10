@@ -1,6 +1,8 @@
 /**
  * Gold Motion Web Application Entry Point
- * Integrates all modules, engines, UI panels, and APK assets
+ * Faithfully converted from decompiled Gold Motion APK
+ * Preserves authentic Android UI, navigation, timeline, tools, and effects
+ * Enforces strict Mandatory Export Guard requiring both XML and Video export before tab closure
  */
 
 import { Scene } from './engine/Scene.js';
@@ -11,12 +13,7 @@ import { EffectPipeline } from './engine/EffectPipeline.js';
 import { XmlHandler } from './xml/XmlHandler.js';
 import { StorageManager } from './storage/StorageManager.js';
 
-import { NavBar } from './ui/NavBar.js';
-import { ProjectsPage } from './ui/ProjectsPage.js';
-import { TemplatesPage } from './ui/TemplatesPage.js';
 import { GraphEditor } from './ui/GraphEditor.js';
-import { ExportDialog } from './ui/ExportDialog.js';
-import { CreateProjectModal } from './ui/CreateProjectModal.js';
 import { ExpressionDialog } from './expressions/ExpressionEngine.js';
 import { ThreeDLabs } from './labs/ThreeDLabs.js';
 import { ToolStudio } from './tools/ToolStudio.js';
@@ -33,23 +30,28 @@ class GoldMotionApp {
     this.renderer = null;
 
     this.currentLayerId = null;
-    this.currentProperty = 'rotation';
+    this.currentDrawerTab = 'transform';
+    this.currentMainTab = 'projects';
+
+    // Anti-loss Mandatory Export State (Strict requirement: both XML and Video must be exported)
+    this.projectExportedXml = false;
+    this.projectExportedVideo = false;
 
     this.canvas = document.getElementById('gmMainCanvas');
     this.init();
   }
 
   async init() {
-    console.log('[Gold Motion Web] Booting application…');
+    console.log('[Gold Motion Web] Booting native Android web runtime…');
 
-    // 1. Initialize engines
+    // 1. Initialize core engines
     await Promise.all([
       this.shapeEngine.init(),
       this.effectPipeline.init(),
       this.storage.initDB()
     ]);
 
-    // 2. Initialize timeline & renderer
+    // 2. Initialize renderer & timeline clock
     this.renderer = new Renderer(this.canvas, this.effectPipeline, this.shapeEngine);
     this.timeline = new Timeline({
       fps: 30,
@@ -58,167 +60,810 @@ class GoldMotionApp {
       onStateChange: (isPlaying) => this.onPlayStateChange(isPlaying)
     });
 
-    // 3. Initialize UI dialogs & mascot
-    this.initDialogs();
+    // 3. Initialize auxiliary tools
+    this.initAuxiliaryTools();
 
-    // 4. Load or restore active project
-    await this.loadInitialProject();
+    // 4. Bind all Android UI controls
+    this.bindAndroidUI();
 
-    // 5. Initialize Navigation & pages
-    this.initNav();
+    // 5. Setup Anti-Close Mandatory Export Guard
+    this.setupMandatoryExportGuard();
 
-    // 6. Bind Editor Controls
-    this.bindEditorControls();
+    // 6. Setup status bar clock
+    this.startClock();
 
-    // Initial render
-    this.render();
+    // 7. Load initial project and render projects list
+    await this.loadInitialProjectsList();
 
-    console.log('[Gold Motion Web] Successfully started.');
+    console.log('[Gold Motion Web] Native UI running.');
   }
 
-  initDialogs() {
-    // Navigation bar
-    this.navBar = new NavBar(
-      document.getElementById('gmNavMount'),
-      (tab) => this.switchPage(tab),
-      () => this.createModal.open()
-    );
+  startClock() {
+    const updateTime = () => {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      const el = document.getElementById('gmStatusTime');
+      if (el) el.textContent = `${h}:${m}`;
+    };
+    updateTime();
+    setInterval(updateTime, 30000);
+  }
 
-    // Create Project modal
-    this.createModal = new CreateProjectModal(
-      document.getElementById('gmCreateModalMount'),
-      (newScene) => this.loadScene(newScene)
-    );
-
-    // Graph editor
+  initAuxiliaryTools() {
+    // Bezier Graph Editor
     this.graphEditor = new GraphEditor(
       document.getElementById('gmGraphModalMount'),
       (curveStr) => this.onCurveApplied(curveStr)
     );
 
-    // Expression editor
+    // Expression Engine Dialog
     this.expressionDialog = new ExpressionDialog(
       document.getElementById('gmExprModalMount'),
       (prop, code, fps) => this.onExpressionApplied(prop, code, fps)
     );
 
-    // Export dialog
-    this.exportDialog = new ExportDialog(
-      document.getElementById('gmExportModalMount'),
-      () => this.scene,
-      () => this.renderer
-    );
-
-    // 3D Labs Studio page
+    // 3D Labs Studio
     this.threeDLabs = new ThreeDLabs(
       document.getElementById('gmLabsPageRoot'),
       (layerData) => {
         if (this.scene) {
           const l = this.scene.createLayer('shape', layerData);
           this.scene.addLayer(l);
-          this.switchPage('editor');
+          this.showActivity('editor');
           this.selectLayer(l.id);
+          this.markUnexported();
           this.render();
         }
       }
     );
 
-    // Extra Tools Studio page
+    // Extra Tools Studio
     this.toolStudio = new ToolStudio(
       document.getElementById('gmToolsPageRoot'),
-      (media) => {}
+      () => {}
     );
 
-    // Interactive Mascot & Gold AI
+    // Mascot
     this.mascot = new GoldMascot(
       document.getElementById('gmMascotMount')
     );
-
-    // Projects Manager page
-    this.projectsPage = new ProjectsPage(
-      document.getElementById('gmProjectsPageMount'),
-      this.storage,
-      (projId) => this.openProjectFromId(projId),
-      () => this.createModal.open()
-    );
-
-    // Templates page
-    this.templatesPage = new TemplatesPage(
-      document.getElementById('gmTemplatesPageMount'),
-      (template) => this.openTemplateProject(template)
-    );
   }
 
-  async loadInitialProject() {
-    try {
-      const saved = await this.storage.getAllProjects();
-      if (saved && saved.length > 0) {
-        this.loadScene(new Scene(saved[0]));
-        return;
+  // ==========================================================
+  // MANDATORY EXPORT GUARD IMPLEMENTATION
+  // ("you can't close the tab without export your project in XML and video")
+  // ==========================================================
+  setupMandatoryExportGuard() {
+    // 1. Browser Native Tab Close / Refresh Interception
+    window.addEventListener('beforeunload', (e) => {
+      if (this.scene && (!this.projectExportedXml || !this.projectExportedVideo)) {
+        e.preventDefault();
+        e.returnValue = 'Gold Motion Alert: You have not exported your project in both XML and Video format! Please export before leaving to prevent data loss.';
+        this.openExportGuardModal();
+        return e.returnValue;
       }
+    });
 
-      // Load sample beta_anim.xml from APK
-      let res = await fetch('./assets/hometab/beta_anim.xml');
-      if (!res.ok) {
-        res = await fetch('/api/sample-project');
-      }
-      if (res && res.ok) {
-        const xml = await res.text();
-        const parsed = XmlHandler.parse(xml);
-        parsed.title = 'Gold Motion Intro';
-        await this.storage.saveProject(parsed);
-        this.loadScene(parsed);
-      } else {
-        this.loadDefaultScene();
-      }
-    } catch (e) {
-      console.warn('[Gold Motion] Could not load sample project, creating default:', e);
-      this.loadDefaultScene();
+    // 2. Export Guard Pill click in editor header
+    document.getElementById('gmExportGuardPill')?.addEventListener('click', () => {
+      this.openExportGuardModal();
+    });
+
+    // 3. Export XML button in modal
+    document.getElementById('gmGuardExportXmlBtn')?.addEventListener('click', async () => {
+      await this.exportProjectXml();
+    });
+
+    // 4. Render Video button in modal
+    document.getElementById('gmGuardExportVideoBtn')?.addEventListener('click', async () => {
+      await this.exportProjectVideo();
+    });
+
+    // 5. 1-Click Master Export: EXPORT ALL (XML + VIDEO) NOW
+    document.getElementById('gmGuardExportBothBtn')?.addEventListener('click', async () => {
+      await this.exportBothXmlAndVideo();
+    });
+
+    // 6. Return to Editor button
+    document.getElementById('gmGuardKeepEditingBtn')?.addEventListener('click', () => {
+      this.closeExportGuardModal();
+    });
+
+    // 7. Safe to Exit button (only active after both are exported)
+    document.getElementById('gmGuardSafeExitBtn')?.addEventListener('click', () => {
+      this.closeExportGuardModal();
+      this.showActivity('main');
+    });
+  }
+
+  markUnexported() {
+    this.projectExportedXml = false;
+    this.projectExportedVideo = false;
+    this.updateExportGuardUI();
+    if (this.scene) {
+      this.storage.saveProject(this.scene);
     }
   }
 
-  loadDefaultScene() {
-    const scene = new Scene({
-      title: 'Gold Motion Project',
-      width: 1920,
-      height: 1080,
-      bgcolor: '#0c0d12',
-      totalTime: 10000,
-      fps: 30
-    });
+  updateExportGuardUI() {
+    const pill = document.getElementById('gmExportGuardPill');
+    const pillText = document.getElementById('gmExportGuardPillText');
+    const itemXml = document.getElementById('gmGuardItemXml');
+    const iconXml = document.getElementById('gmGuardIconXml');
+    const statusXml = document.getElementById('gmGuardStatusXml');
+    const itemVid = document.getElementById('gmGuardItemVideo');
+    const iconVid = document.getElementById('gmGuardIconVideo');
+    const statusVid = document.getElementById('gmGuardStatusVideo');
+    const banner = document.getElementById('gmGuardSuccessBanner');
+    const safeExitBtn = document.getElementById('gmGuardSafeExitBtn');
 
-    // 1. Gold Title Text
-    scene.addLayer(scene.createLayer('text', {
-      label: 'Gold Motion Title',
-      tag: 'gold',
-      content: 'GOLD MOTION',
-      fontSize: 84,
-      font: 'Audiowide',
-      fillColor: '#f6c945',
-      location: [960, 480],
-      scale: [1, 1],
-      rotation: 0
-    }));
+    // XML status
+    if (this.projectExportedXml) {
+      itemXml?.classList.add('done');
+      if (iconXml) iconXml.textContent = '✅';
+      if (statusXml) statusXml.textContent = 'Exported & Downloaded (.xml)';
+    } else {
+      itemXml?.classList.remove('done');
+      if (iconXml) iconXml.textContent = '❌';
+      if (statusXml) statusXml.textContent = 'Not exported yet';
+    }
 
-    // 2. Subtitle Text
-    scene.addLayer(scene.createLayer('text', {
-      label: 'Subtitle',
-      tag: 'purple',
-      content: 'MOTION GRAPHICS & VFX',
-      fontSize: 32,
-      font: 'Roboto',
-      fillColor: '#ffffff',
-      location: [960, 600]
-    }));
+    // Video status
+    if (this.projectExportedVideo) {
+      itemVid?.classList.add('done');
+      if (iconVid) iconVid.textContent = '✅';
+      if (statusVid) statusVid.textContent = 'Rendered & Downloaded (.webm)';
+    } else {
+      itemVid?.classList.remove('done');
+      if (iconVid) iconVid.textContent = '❌';
+      if (statusVid) statusVid.textContent = 'Not rendered yet';
+    }
 
-    this.loadScene(scene);
+    // Combined state
+    const bothExported = this.projectExportedXml && this.projectExportedVideo;
+    if (bothExported) {
+      pill?.classList.add('saved');
+      if (pillText) pillText.textContent = '✅ Saved & Exported';
+      if (banner) banner.style.display = 'block';
+      if (safeExitBtn) safeExitBtn.style.display = 'block';
+    } else {
+      pill?.classList.remove('saved');
+      const xmlStat = this.projectExportedXml ? 'XML: ✅' : 'XML: ❌';
+      const vidStat = this.projectExportedVideo ? 'Video: ✅' : 'Video: ❌';
+      if (pillText) pillText.textContent = `🔒 ${xmlStat} | ${vidStat}`;
+      if (banner) banner.style.display = 'none';
+      if (safeExitBtn) safeExitBtn.style.display = 'none';
+    }
   }
 
+  openExportGuardModal() {
+    this.updateExportGuardUI();
+    const modal = document.getElementById('gmExportGuardModal');
+    if (modal) modal.classList.add('active');
+  }
+
+  closeExportGuardModal() {
+    const modal = document.getElementById('gmExportGuardModal');
+    if (modal) modal.classList.remove('active');
+  }
+
+  // XML Export Engine
+  async exportProjectXml() {
+    if (!this.scene) return;
+    try {
+      const xmlString = XmlHandler.serialize(this.scene);
+      const blob = new Blob([xmlString], { type: 'application/xml' });
+      const filename = `${(this.scene.title || 'Gold_Motion').replace(/\s+/g, '_')}.xml`;
+      this.triggerDownload(blob, filename);
+
+      this.projectExportedXml = true;
+      this.updateExportGuardUI();
+      console.log(`[Gold Motion] XML Project exported: ${filename}`);
+    } catch (e) {
+      console.error('[Gold Motion] XML export error:', e);
+      alert('Error exporting XML: ' + e.message);
+    }
+  }
+
+  // Video Frame-by-Frame Render Engine
+  async exportProjectVideo() {
+    if (!this.scene || !this.renderer) return;
+
+    const progressWrap = document.getElementById('gmGuardProgressWrap');
+    const progressFill = document.getElementById('gmGuardProgressFill');
+    const progressLabel = document.getElementById('gmGuardProgressLabel');
+    const progressPercent = document.getElementById('gmGuardProgressPercent');
+    const exportBtn = document.getElementById('gmGuardExportVideoBtn');
+    const masterBtn = document.getElementById('gmGuardExportBothBtn');
+
+    if (progressWrap) progressWrap.style.display = 'block';
+    if (exportBtn) exportBtn.disabled = true;
+    if (masterBtn) masterBtn.disabled = true;
+
+    try {
+      const fps = this.scene.fps || 30;
+      const totalFrames = Math.max(1, Math.floor((this.scene.totalTime / 1000) * fps));
+      const canvas = this.renderer.canvas;
+
+      const stream = canvas.captureStream(fps);
+      const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+        ? 'video/webm;codecs=vp9'
+        : 'video/webm';
+
+      const chunks = [];
+      const recorder = new MediaRecorder(stream, {
+        mimeType: mime,
+        videoBitsPerSecond: 10000000 // 10 Mbps Pro Quality
+      });
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) chunks.push(e.data);
+      };
+
+      recorder.start();
+
+      // Render every frame sequentially
+      for (let f = 0; f <= totalFrames; f++) {
+        const timeMs = (f / fps) * 1000;
+        this.renderer.render(this.scene, timeMs);
+
+        const pct = Math.floor((f / totalFrames) * 100);
+        if (progressFill) progressFill.style.width = `${pct}%`;
+        if (progressPercent) progressPercent.textContent = `${pct}%`;
+        if (progressLabel) progressLabel.textContent = `Rendering frame ${f} of ${totalFrames} (${pct}%)`;
+
+        // Small tick for canvas capture
+        await new Promise((r) => setTimeout(r, 1000 / fps));
+      }
+
+      await new Promise((resolve) => {
+        recorder.onstop = () => {
+          const videoBlob = new Blob(chunks, { type: mime });
+          const filename = `${(this.scene.title || 'Gold_Motion').replace(/\s+/g, '_')}_rendered.webm`;
+          this.triggerDownload(videoBlob, filename);
+          resolve();
+        };
+        recorder.stop();
+      });
+
+      this.projectExportedVideo = true;
+      this.updateExportGuardUI();
+      console.log('[Gold Motion] Video rendered and downloaded successfully.');
+    } catch (e) {
+      console.error('[Gold Motion] Video export error:', e);
+      alert('Error rendering video: ' + e.message);
+    } finally {
+      if (progressWrap) progressWrap.style.display = 'none';
+      if (exportBtn) exportBtn.disabled = false;
+      if (masterBtn) masterBtn.disabled = false;
+    }
+  }
+
+  // 1-Click Dual Export (XML + Video)
+  async exportBothXmlAndVideo() {
+    await this.exportProjectXml();
+    await this.exportProjectVideo();
+  }
+
+  triggerDownload(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  // ==========================================================
+  // NATIVE ANDROID UI ROUTING & EVENT BINDINGS
+  // ==========================================================
+  bindAndroidUI() {
+    // 1. Header Tabs: Home, Projects, Elements
+    const tabHome = document.getElementById('gmTabHome');
+    const tabProjects = document.getElementById('gmTabProjects');
+    const tabElements = document.getElementById('gmTabElements');
+
+    tabHome?.addEventListener('click', () => this.switchMainTab('home'));
+    tabProjects?.addEventListener('click', () => this.switchMainTab('projects'));
+    tabElements?.addEventListener('click', () => this.switchMainTab('elements'));
+
+    // 2. Side Menu Drawer (hamburger button)
+    document.getElementById('gmButtonSideMenu')?.addEventListener('click', () => {
+      document.getElementById('gmSideMenuScrim')?.classList.add('active');
+    });
+    document.getElementById('gmCloseSideMenu')?.addEventListener('click', () => {
+      document.getElementById('gmSideMenuScrim')?.classList.remove('active');
+    });
+    document.getElementById('gmSideMenuScrim')?.addEventListener('click', (e) => {
+      if (e.target.id === 'gmSideMenuScrim') {
+        document.getElementById('gmSideMenuScrim')?.classList.remove('active');
+      }
+    });
+
+    // Side Menu items
+    document.getElementById('gmSideMenuOpenLabs')?.addEventListener('click', () => {
+      document.getElementById('gmSideMenuScrim')?.classList.remove('active');
+      this.threeDLabs.open();
+    });
+    document.getElementById('gmSideMenuOpenTools')?.addEventListener('click', () => {
+      document.getElementById('gmSideMenuScrim')?.classList.remove('active');
+      this.toolStudio.open();
+    });
+    document.getElementById('gmBackupNowBtn')?.addEventListener('click', () => {
+      this.storage.downloadFullBackup();
+    });
+
+    // 3. Overflow button
+    document.getElementById('gmButtonOverflow')?.addEventListener('click', () => {
+      document.getElementById('gmSideMenuScrim')?.classList.add('active');
+    });
+
+    // 4. Floating Action Button [+] Create Project
+    document.getElementById('gmNewProjectFab')?.addEventListener('click', () => {
+      this.openCreateProjectModal();
+    });
+
+    // Create Project modal events
+    document.getElementById('gmButtonCancelCreate')?.addEventListener('click', () => {
+      this.closeCreateProjectModal();
+    });
+    document.getElementById('gmClearProjectTitleBtn')?.addEventListener('click', () => {
+      const input = document.getElementById('gmNewProjectTitle');
+      if (input) input.value = '';
+    });
+
+    // Aspect ratio selector
+    document.querySelectorAll('#gmAspectRow .gm-aspect-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#gmAspectRow .gm-aspect-btn').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+
+    // Create project button submit
+    document.getElementById('gmButtonCreateProject')?.addEventListener('click', () => {
+      this.handleCreateProjectSubmit();
+    });
+
+    // 5. Editor Activity Nav Bar
+    document.getElementById('gmExitToProjectList')?.addEventListener('click', () => {
+      if (!this.projectExportedXml || !this.projectExportedVideo) {
+        // Enforce export before exiting to project list
+        this.openExportGuardModal();
+      } else {
+        this.showActivity('main');
+        this.loadInitialProjectsList();
+      }
+    });
+
+    document.getElementById('gmProjectTitleInputNav')?.addEventListener('input', (e) => {
+      if (this.scene) {
+        this.scene.title = e.target.value;
+        this.markUnexported();
+      }
+    });
+
+    document.getElementById('gmButtonExport')?.addEventListener('click', () => {
+      this.openExportGuardModal();
+    });
+
+    document.getElementById('gmProjectSettings')?.addEventListener('click', () => {
+      this.openCreateProjectModal(true);
+    });
+
+    // 6. Preview controls
+    document.getElementById('gmResetZoomBtn')?.addEventListener('click', () => {
+      this.renderer?.resetZoom();
+      this.render();
+    });
+    document.getElementById('gmToggleGridBtn')?.addEventListener('click', () => {
+      if (this.renderer) {
+        this.renderer.showGrid = !this.renderer.showGrid;
+        this.render();
+      }
+    });
+
+    // 7. Transport & Playbar
+    document.getElementById('gmButtonPlay')?.addEventListener('click', () => {
+      this.timeline.toggle();
+    });
+    document.getElementById('gmButtonUndo')?.addEventListener('click', () => {
+      if (this.scene) {
+        this.scene.undo();
+        this.markUnexported();
+        this.updateTimelineUI();
+        this.updatePropertiesUI();
+        this.render();
+      }
+    });
+    document.getElementById('gmButtonRedo')?.addEventListener('click', () => {
+      if (this.scene) {
+        this.scene.redo();
+        this.markUnexported();
+        this.updateTimelineUI();
+        this.updatePropertiesUI();
+        this.render();
+      }
+    });
+    document.getElementById('gmButtonSkipBack')?.addEventListener('click', () => {
+      this.timeline.seekFrame(-1);
+    });
+    document.getElementById('gmButtonSkipFwd')?.addEventListener('click', () => {
+      this.timeline.seekFrame(1);
+    });
+    document.getElementById('gmButtonLayers')?.addEventListener('click', () => {
+      this.toggleKeyframeAtCurrentTime();
+    });
+
+    // 8. Timeline Ruler Scrubbing
+    const ruler = document.getElementById('gmRuler');
+    if (ruler) {
+      let isScrubbing = false;
+      const scrub = (e) => {
+        const rect = ruler.getBoundingClientRect();
+        const p = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        this.timeline.seek(p * this.timeline.totalTime);
+      };
+      ruler.addEventListener('pointerdown', (e) => {
+        isScrubbing = true;
+        scrub(e);
+      });
+      window.addEventListener('pointermove', (e) => {
+        if (isScrubbing) scrub(e);
+      });
+      window.addEventListener('pointerup', () => (isScrubbing = false));
+    }
+
+    // 9. Floating Add Layer Button [+]
+    document.getElementById('gmButtonAddLayer')?.addEventListener('click', () => {
+      this.openAddLayerSheet();
+    });
+    document.getElementById('gmButtonCloseAdd')?.addEventListener('click', () => {
+      this.closeAddLayerSheet();
+    });
+
+    // Add Sheet Tabs
+    document.querySelectorAll('#gmElementTabHolder .gm-add-tab').forEach((tab) => {
+      tab.addEventListener('click', () => {
+        const target = tab.dataset.addTab;
+        document.querySelectorAll('#gmElementTabHolder .gm-add-tab').forEach((t) => t.classList.remove('active'));
+        tab.classList.add('active');
+
+        document.querySelectorAll('.gm-add-page').forEach((p) => p.classList.remove('active'));
+        if (target === 'shape') document.getElementById('gmAddPageShape')?.classList.add('active');
+        if (target === 'media') document.getElementById('gmAddPageMedia')?.classList.add('active');
+        if (target === 'audio') document.getElementById('gmAddPageAudio')?.classList.add('active');
+        if (target === 'objects') document.getElementById('gmAddPageObjects')?.classList.add('active');
+        if (target === 'templates') document.getElementById('gmAddPageTemplates')?.classList.add('active');
+      });
+    });
+
+    // Quick Add Buttons
+    document.getElementById('gmBtnQuickText')?.addEventListener('click', () => {
+      this.addTextLayer();
+      this.closeAddLayerSheet();
+    });
+    document.getElementById('gmBtnQuickDraw')?.addEventListener('click', () => {
+      this.addShapeLayer('path');
+      this.closeAddLayerSheet();
+    });
+    document.getElementById('gmBtnQuickVector')?.addEventListener('click', () => {
+      this.addShapeLayer('vector');
+      this.closeAddLayerSheet();
+    });
+
+    // Primitives in Objects Tab
+    document.getElementById('gmAddObjCamera')?.addEventListener('click', () => {
+      this.addCameraLayer();
+      this.closeAddLayerSheet();
+    });
+    document.getElementById('gmAddObjNull')?.addEventListener('click', () => {
+      this.addNullLayer();
+      this.closeAddLayerSheet();
+    });
+    document.getElementById('gmAddObjLight')?.addEventListener('click', () => {
+      this.addLightLayer();
+      this.closeAddLayerSheet();
+    });
+    document.getElementById('gmAddObjGroup')?.addEventListener('click', () => {
+      this.addGroupLayer();
+      this.closeAddLayerSheet();
+    });
+
+    // File pickers in Add Sheet
+    document.getElementById('gmMediaFileInput')?.addEventListener('change', (e) => {
+      this.handleMediaUpload(e.target.files[0]);
+    });
+    document.getElementById('gmAudioFileInput')?.addEventListener('change', (e) => {
+      this.handleAudioUpload(e.target.files[0]);
+    });
+
+    // XML Import
+    document.getElementById('gmXmlImportInput')?.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const text = await file.text();
+        const scene = XmlHandler.parse(text);
+        await this.storage.saveProject(scene);
+        this.loadScene(scene);
+        this.showActivity('editor');
+        document.getElementById('gmSideMenuScrim')?.classList.remove('active');
+      }
+    });
+
+    // Home card buttons
+    document.getElementById('gmLoadSampleBtn')?.addEventListener('click', async () => {
+      await this.loadSampleBetaAnim();
+    });
+    document.getElementById('gmOpenLabsFromHome')?.addEventListener('click', () => {
+      this.threeDLabs.open();
+    });
+    document.getElementById('gmOpenToolsFromHome')?.addEventListener('click', () => {
+      this.toolStudio.open();
+    });
+
+    // 10. Layer Drawer Tabs & Pan Trackpad
+    document.querySelectorAll('.gm-drawer-tab').forEach((tab) => {
+      tab.addEventListener('click', () => {
+        const target = tab.dataset.drawerTab;
+        this.switchDrawerTab(target);
+      });
+    });
+    document.getElementById('gmDrawerClose')?.addEventListener('click', () => {
+      document.getElementById('gmLayerDrawer')?.classList.remove('active');
+    });
+
+    // Pan Trackpad Drag
+    this.setupPanTrackpad();
+
+    // Transform Sliders
+    this.setupTransformSliders();
+
+    // Color Swatches
+    this.setupColorPalette();
+
+    // Border & Shadow
+    this.setupBorderAndShadow();
+
+    // Blending & Opacity
+    this.setupBlendingAndOpacity();
+
+    // Add Effect Modal Button
+    document.getElementById('gmOpenAddEffectModalBtn')?.addEventListener('click', () => {
+      const layer = this.scene?.getLayer(this.currentLayerId);
+      if (layer) this.openEffectCatalogModal(layer);
+    });
+  }
+
+  switchMainTab(tab) {
+    this.currentMainTab = tab;
+    const underline = document.getElementById('gmTabUnderline');
+    const tabs = ['home', 'projects', 'elements'];
+    const idx = tabs.indexOf(tab);
+
+    if (underline && idx !== -1) {
+      underline.style.left = `${idx * 33.333}%`;
+    }
+
+    document.querySelectorAll('.gm-tab-item').forEach((t) => t.classList.remove('active'));
+    if (tab === 'home') document.getElementById('gmTabHome')?.classList.add('active');
+    if (tab === 'projects') document.getElementById('gmTabProjects')?.classList.add('active');
+    if (tab === 'elements') document.getElementById('gmTabElements')?.classList.add('active');
+
+    document.querySelectorAll('.gm-pager-view').forEach((v) => v.classList.remove('active'));
+    if (tab === 'home') document.getElementById('gmViewHome')?.classList.add('active');
+    if (tab === 'projects') {
+      document.getElementById('gmViewProjects')?.classList.add('active');
+      this.loadInitialProjectsList();
+    }
+    if (tab === 'elements') document.getElementById('gmViewElements')?.classList.add('active');
+  }
+
+  showActivity(activityName) {
+    document.querySelectorAll('.gm-activity').forEach((a) => a.classList.remove('active'));
+    if (activityName === 'main') {
+      document.getElementById('gmMainActivity')?.classList.add('active');
+    } else if (activityName === 'editor') {
+      document.getElementById('gmEditorActivity')?.classList.add('active');
+    }
+  }
+
+  // ==========================================================
+  // PROJECTS LIST & INITIAL DATA
+  // ==========================================================
+  async loadInitialProjectsList() {
+    const grid = document.getElementById('gmProjectsGrid');
+    if (!grid) return;
+
+    const projects = await this.storage.getAllProjects();
+    if (!projects || projects.length === 0) {
+      grid.innerHTML = `
+        <div class="gm-empty-state" style="grid-column: 1 / -1;">
+          <div class="gm-empty-icon">📁</div>
+          <h4>No Projects Yet</h4>
+          <p>Tap the gold [+] button at the bottom right to start your first motion graphics project!</p>
+        </div>
+      `;
+      return;
+    }
+
+    grid.innerHTML = projects
+      .map((proj) => {
+        const aspect = `${proj.width > proj.height ? '16:9' : proj.height > proj.width ? '9:16' : '1:1'} ${proj.height}p`;
+        const durationSec = ((proj.totalTime || 10000) / 1000).toFixed(1);
+        const lastEdited = new Date(proj.updatedAt || Date.now()).toLocaleDateString();
+
+        return `
+          <div class="gm-project-card" data-proj-id="${proj.id}">
+            <div class="gm-card-thumb-wrap">
+              <div style="font-size: 32px; color: var(--gm-gold-primary); opacity: 0.8;">🎬</div>
+              <div class="gm-card-badge">${aspect}</div>
+              <div class="gm-card-duration">00:0${durationSec}</div>
+            </div>
+            <div class="gm-card-info">
+              <div class="gm-card-title-group">
+                <h4>${proj.title || 'Untitled Project'}</h4>
+                <p>Edited ${lastEdited}</p>
+              </div>
+              <button class="gm-card-menu-btn" data-action="delete-proj" data-proj-id="${proj.id}" title="Delete Project">
+                ✕
+              </button>
+            </div>
+          </div>
+        `;
+      })
+      .join('');
+
+    grid.querySelectorAll('.gm-project-card').forEach((card) => {
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('[data-action="delete-proj"]')) {
+          e.stopPropagation();
+          const id = e.target.closest('[data-action="delete-proj"]').dataset.projId;
+          if (confirm('Delete this project?')) {
+            this.storage.deleteProject(id).then(() => this.loadInitialProjectsList());
+          }
+          return;
+        }
+        const id = card.dataset.projId;
+        this.openProject(id);
+      });
+    });
+  }
+
+  async openProject(id) {
+    const proj = await this.storage.getProject(id);
+    if (proj) {
+      this.loadScene(new Scene(proj));
+      this.showActivity('editor');
+    }
+  }
+
+  async loadSampleBetaAnim() {
+    try {
+      const res = await fetch('./assets/hometab/beta_anim.xml');
+      if (res.ok) {
+        const xml = await res.text();
+        const scene = XmlHandler.parse(xml);
+        scene.title = 'Beta Anim Showcase';
+        await this.storage.saveProject(scene);
+        this.loadScene(scene);
+        this.showActivity('editor');
+      }
+    } catch (e) {
+      console.warn('[Gold Motion] Could not load sample XML:', e);
+    }
+  }
+
+  // ==========================================================
+  // CREATE PROJECT FLOW (activity_project_list_addpopup_large.xml)
+  // ==========================================================
+  openCreateProjectModal(isSettings = false) {
+    const modal = document.getElementById('gmCreateProjectModal');
+    if (!modal) return;
+    modal.classList.add('active');
+
+    const titleInput = document.getElementById('gmNewProjectTitle');
+    const submitBtn = document.getElementById('gmButtonCreateProject');
+
+    if (isSettings && this.scene) {
+      if (titleInput) titleInput.value = this.scene.title;
+      if (submitBtn) submitBtn.textContent = 'Save Settings';
+    } else {
+      if (titleInput) titleInput.value = `Project ${(Math.floor(Math.random() * 90) + 10)}`;
+      if (submitBtn) submitBtn.textContent = 'Create project';
+    }
+  }
+
+  closeCreateProjectModal() {
+    const modal = document.getElementById('gmCreateProjectModal');
+    if (modal) modal.classList.remove('active');
+  }
+
+  handleCreateProjectSubmit() {
+    const titleInput = document.getElementById('gmNewProjectTitle');
+    const resSelect = document.getElementById('gmSelectResolution');
+    const fpsSelect = document.getElementById('gmSelectFps');
+    const bgSelect = document.getElementById('gmSelectBgColor');
+    const activeAspectBtn = document.querySelector('#gmAspectRow .gm-aspect-btn.active');
+
+    const aspect = activeAspectBtn?.dataset.aspect || '16:9';
+    const res = parseInt(resSelect?.value || '1080');
+    const fps = parseInt(fpsSelect?.value || '30');
+    const bgcolor = bgSelect?.value || '#000000';
+    const title = titleInput?.value.trim() || 'Project 1';
+
+    let width = 1920;
+    let height = 1080;
+
+    if (aspect === '16:9') {
+      height = res;
+      width = Math.round((res * 16) / 9);
+    } else if (aspect === '9:16') {
+      width = res;
+      height = Math.round((res * 16) / 9);
+    } else if (aspect === '1:1') {
+      width = res;
+      height = res;
+    } else if (aspect === '4:3') {
+      height = res;
+      width = Math.round((res * 4) / 3);
+    } else if (aspect === '4:5') {
+      width = res;
+      height = Math.round((res * 5) / 4);
+    }
+
+    const scene = new Scene({
+      title,
+      width,
+      height,
+      bgcolor,
+      totalTime: 10000,
+      fps
+    });
+
+    // Add default Gold Motion Title Layer
+    scene.addLayer(
+      scene.createLayer('text', {
+        label: 'Gold Motion Title',
+        tag: 'gold',
+        content: title.toUpperCase(),
+        fontSize: Math.round(width * 0.05),
+        font: 'Audiowide',
+        fillColor: '#f6c945',
+        location: [width / 2, height / 2],
+        scale: [1, 1],
+        rotation: 0
+      })
+    );
+
+    this.loadScene(scene);
+    this.closeCreateProjectModal();
+    this.showActivity('editor');
+    this.markUnexported();
+  }
+
+  // ==========================================================
+  // SCENE & TIMELINE STATE
+  // ==========================================================
   loadScene(scene) {
     this.scene = scene;
     this.timeline.totalTime = scene.totalTime;
     this.timeline.fps = scene.fps;
     this.timeline.currentTime = 0;
+
+    // Reset export flags for freshly loaded scene
+    this.projectExportedXml = false;
+    this.projectExportedVideo = false;
+    this.updateExportGuardUI();
+
+    const titleInput = document.getElementById('gmProjectTitleInputNav');
+    if (titleInput) titleInput.value = scene.title || 'Gold Motion';
+
+    // Populate shapes grid in Add Sheet
+    this.populateShapesGrid();
 
     if (scene.layers.length > 0) {
       this.selectLayer(scene.layers[0].id);
@@ -226,85 +871,37 @@ class GoldMotionApp {
       this.selectLayer(null);
     }
 
-    const titleEl = document.getElementById('gmEditorProjectName');
-    if (titleEl) titleEl.textContent = scene.title || 'Gold Motion Studio';
+    this.updateTimelineUI();
+    this.render();
+  }
+
+  selectLayer(layerId) {
+    this.currentLayerId = layerId;
+    const drawer = document.getElementById('gmLayerDrawer');
+    const overlay = document.getElementById('gmTransformOverlay');
+
+    if (layerId && this.scene) {
+      drawer?.classList.add('active');
+      overlay ? (overlay.style.display = 'block') : null;
+      this.updatePropertiesUI();
+    } else {
+      drawer?.classList.remove('active');
+      overlay ? (overlay.style.display = 'none') : null;
+    }
 
     this.updateTimelineUI();
     this.render();
   }
 
-  switchPage(tab) {
-    // Hide all pages
-    document.querySelectorAll('.gm-page').forEach(p => p.classList.remove('active'));
-
-    const editorView = document.getElementById('gmEditorView');
-    const homeView = document.getElementById('gmHomePage');
-    const projectsView = document.getElementById('gmProjectsPageMount').firstElementChild;
-    const labsView = document.getElementById('gmLabsPageRoot').firstElementChild;
-    const templatesView = document.getElementById('gmTemplatesPageMount').firstElementChild;
-    const toolsView = document.getElementById('gmToolsPageRoot').firstElementChild;
-
-    if (tab === 'home') {
-      homeView?.classList.add('active');
-    } else if (tab === 'projects') {
-      projectsView?.classList.add('active');
-      this.projectsPage.refresh();
-    } else if (tab === 'labs') {
-      labsView?.classList.add('active');
-    } else if (tab === 'templates') {
-      templatesView?.classList.add('active');
-    } else if (tab === 'tools') {
-      toolsView?.classList.add('active');
-    } else if (tab === 'editor') {
-      editorView?.classList.add('active');
-    }
-
-    this.navBar.setActive(tab);
-  }
-
-  async openProjectFromId(id) {
-    const proj = await this.storage.getProject(id);
-    if (proj) {
-      this.loadScene(new Scene(proj));
-      this.switchPage('editor');
-    }
-  }
-
-  openTemplateProject(template) {
-    const scene = new Scene({
-      title: template.title,
-      width: template.aspect === '9:16' ? 1080 : 1920,
-      height: template.aspect === '9:16' ? 1920 : 1080,
-      bgcolor: '#090a0f',
-      totalTime: template.duration || 8000,
-      fps: template.fps || 30
-    });
-
-    scene.addLayer(scene.createLayer('text', {
-      label: template.title,
-      tag: 'gold',
-      content: template.title.toUpperCase(),
-      fontSize: 72,
-      font: 'Audiowide',
-      fillColor: '#f6c945',
-      location: [scene.width / 2, scene.height / 2]
-    }));
-
-    this.loadScene(scene);
-    this.switchPage('editor');
-  }
-
   onTimeUpdate(ms) {
-    // Update timecode display
     const tcEl = document.getElementById('gmTimecode');
     if (tcEl) tcEl.textContent = this.timeline.formatTimecode(ms);
 
-    // Update playhead position in tracks ruler
-    const tracksContainer = document.getElementById('gmTracksContainer');
+    const lanesWrap = document.getElementById('gmTimelineLanesWrap');
     const playhead = document.getElementById('gmPlayheadLine');
-    if (tracksContainer && playhead) {
-      const totalW = tracksContainer.clientWidth || 1000;
-      const x = (ms / this.timeline.totalTime) * totalW;
+    if (lanesWrap && playhead && this.scene) {
+      const w = lanesWrap.scrollWidth || 1000;
+      const x = (ms / this.scene.totalTime) * w;
       playhead.style.transform = `translateX(${x}px)`;
     }
 
@@ -312,11 +909,11 @@ class GoldMotionApp {
   }
 
   onPlayStateChange(isPlaying) {
-    const playBtn = document.getElementById('gmPlayBtn');
-    if (playBtn) {
-      playBtn.innerHTML = isPlaying
-        ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`
-        : `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+    const btn = document.getElementById('gmButtonPlay');
+    if (btn) {
+      btn.innerHTML = isPlaying
+        ? `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`
+        : `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8.4,5.55C8.4,4.75 9.28,4.27 9.95,4.7L19.25,10.65C19.87,11.05 19.87,11.95 19.25,12.35L9.95,18.3C9.28,18.73 8.4,18.25 8.4,17.45Z"/></svg>`;
     }
   }
 
@@ -326,65 +923,61 @@ class GoldMotionApp {
     this.renderer.render(this.scene, this.timeline.currentTime);
   }
 
-  selectLayer(layerId) {
-    this.currentLayerId = layerId;
-    this.updateTimelineUI();
-    this.updatePropertiesUI();
-    this.render();
-  }
-
+  // ==========================================================
+  // TIMELINE UI (Headers, Clips, Diamonds)
+  // ==========================================================
   updateTimelineUI() {
     const headersList = document.getElementById('gmTrackHeadersList');
     const lanesList = document.getElementById('gmLanesList');
     if (!headersList || !lanesList || !this.scene) return;
 
-    // Render Headers
-    headersList.innerHTML = this.scene.layers.map(l => {
-      const isSelected = l.id === this.currentLayerId;
-      return `
-        <div class="gm-track-header-row ${isSelected ? 'active' : ''}" data-lid="${l.id}">
-          <div class="gm-track-tag" style="background: var(--gm-accent-${l.tag || 'gold'});"></div>
-          <svg class="gm-track-eye ${l.visible ? 'on' : ''}" data-action="toggle-vis" data-lid="${l.id}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            ${l.visible 
-              ? '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>'
-              : '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>'
+    headersList.innerHTML = this.scene.layers
+      .map((l) => {
+        const isSel = l.id === this.currentLayerId;
+        return `
+          <div class="gm-track-header-row ${isSel ? 'active' : ''}" data-lid="${l.id}">
+            <svg class="gm-track-eye ${l.visible ? 'on' : ''}" data-action="toggle-vis" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              ${
+                l.visible
+                  ? '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>'
+                  : '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>'
+              }
+            </svg>
+            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${l.label}</span>
+          </div>
+        `;
+      })
+      .join('');
+
+    lanesList.innerHTML = this.scene.layers
+      .map((l) => {
+        const isSel = l.id === this.currentLayerId;
+        const leftPct = (l.startTime / this.scene.totalTime) * 100;
+        const widthPct = Math.max(3, ((l.endTime - l.startTime) / this.scene.totalTime) * 100);
+
+        let kfDiamonds = '';
+        if (l.transform?.keyframes) {
+          for (const [, kfList] of Object.entries(l.transform.keyframes)) {
+            if (!Array.isArray(kfList)) continue;
+            for (const kf of kfList) {
+              const kfLeft = kf.t * 100;
+              kfDiamonds += `<div class="gm-kf-diamond" style="left: ${kfLeft}%;"></div>`;
             }
-          </svg>
-          <span class="gm-track-name">${l.label}</span>
-        </div>
-      `;
-    }).join('');
-
-    // Render Track Lanes
-    lanesList.innerHTML = this.scene.layers.map(l => {
-      const isSelected = l.id === this.currentLayerId;
-      const leftPct = (l.startTime / this.scene.totalTime) * 100;
-      const widthPct = Math.max(2, ((l.endTime - l.startTime) / this.scene.totalTime) * 100);
-
-      // Render keyframes inside clip bar
-      let kfDiamonds = '';
-      if (l.transform.keyframes) {
-        for (const [prop, kfList] of Object.entries(l.transform.keyframes)) {
-          if (!Array.isArray(kfList)) continue;
-          for (const kf of kfList) {
-            const kfLeft = kf.t * 100;
-            kfDiamonds += `<div class="gm-kf-diamond" style="left: ${kfLeft}%;" title="${prop} at ${(kf.t * 100).toFixed(0)}%"></div>`;
           }
         }
-      }
 
-      return `
-        <div class="gm-track-lane" data-lid="${l.id}">
-          <div class="gm-clip-bar ${isSelected ? 'active' : ''}" style="left: ${leftPct}%; width: ${widthPct}%;">
-            <span>${l.label}</span>
-            ${kfDiamonds}
+        return `
+          <div class="gm-track-lane" data-lid="${l.id}">
+            <div class="gm-clip-bar ${isSel ? 'active' : ''}" style="left: ${leftPct}%; width: ${widthPct}%;">
+              <span>${l.label}</span>
+              ${kfDiamonds}
+            </div>
           </div>
-        </div>
-      `;
-    }).join('');
+        `;
+      })
+      .join('');
 
-    // Attach row events
-    headersList.querySelectorAll('.gm-track-header-row').forEach(row => {
+    headersList.querySelectorAll('.gm-track-header-row').forEach((row) => {
       row.addEventListener('click', (e) => {
         const lid = row.dataset.lid;
         if (e.target.closest('[data-action="toggle-vis"]')) {
@@ -398,227 +991,478 @@ class GoldMotionApp {
       });
     });
 
-    lanesList.querySelectorAll('.gm-track-lane').forEach(lane => {
+    lanesList.querySelectorAll('.gm-track-lane').forEach((lane) => {
       lane.addEventListener('click', () => {
         this.selectLayer(lane.dataset.lid);
       });
     });
   }
 
-  updatePropertiesUI() {
-    const propPanel = document.getElementById('gmPropertiesPanel');
-    if (!propPanel || !this.scene) return;
+  // ==========================================================
+  // LAYER PROPERTIES BOTTOM DRAWER
+  // ==========================================================
+  switchDrawerTab(tab) {
+    this.currentDrawerTab = tab;
+    document.querySelectorAll('.gm-drawer-tab').forEach((t) => t.classList.remove('active'));
+    document.querySelector(`.gm-drawer-tab[data-drawer-tab="${tab}"]`)?.classList.add('active');
 
-    const layer = this.scene.getLayer(this.currentLayerId);
-    if (!layer) {
-      propPanel.innerHTML = `
-        <div class="gm-prop-header">
-          <span>Project Properties</span>
-        </div>
-        <div class="gm-prop-section">
-          <div class="gm-prop-row">
-            <span class="gm-prop-label">Title</span>
-            <input type="text" class="gm-prop-input" id="gmPropTitle" value="${this.scene.title}" style="width: 140px; text-align: left;">
-          </div>
-          <div class="gm-prop-row">
-            <span class="gm-prop-label">Resolution</span>
-            <span style="font-weight: 700;">${this.scene.width} x ${this.scene.height}</span>
-          </div>
-          <div class="gm-prop-row">
-            <span class="gm-prop-label">Duration</span>
-            <span style="font-weight: 700;">${this.scene.totalTime / 1000}s</span>
-          </div>
-        </div>
-      `;
+    document.querySelectorAll('.gm-drawer-panel').forEach((p) => p.classList.remove('active'));
+    if (tab === 'transform') document.getElementById('gmPanelTransform')?.classList.add('active');
+    if (tab === 'color') document.getElementById('gmPanelColor')?.classList.add('active');
+    if (tab === 'border') document.getElementById('gmPanelBorder')?.classList.add('active');
+    if (tab === 'blending') document.getElementById('gmPanelBlending')?.classList.add('active');
+    if (tab === 'effects') document.getElementById('gmPanelEffects')?.classList.add('active');
+  }
+
+  updatePropertiesUI() {
+    const layer = this.scene?.getLayer(this.currentLayerId);
+    if (!layer) return;
+
+    // Transform
+    const loc = layer.transform?.location || [this.scene.width / 2, this.scene.height / 2];
+    const rot = layer.transform?.rotation || 0;
+    const scale = layer.transform?.scale || [1, 1];
+
+    const posX = document.getElementById('gmTransformPosX');
+    const posY = document.getElementById('gmTransformPosY');
+    const rotSlider = document.getElementById('gmSliderRotate');
+    const rotVal = document.getElementById('gmValRotate');
+    const scaleSlider = document.getElementById('gmSliderScale');
+    const scaleVal = document.getElementById('gmValScale');
+
+    if (posX) posX.value = Math.round(loc[0]);
+    if (posY) posY.value = Math.round(loc[1]);
+    if (rotSlider) rotSlider.value = rot;
+    if (rotVal) rotVal.textContent = `${Math.round(rot)}°`;
+    if (scaleSlider) scaleSlider.value = scale[0];
+    if (scaleVal) scaleVal.textContent = `${scale[0].toFixed(1)}x`;
+
+    // Keyframe diamond active state
+    const kfBtn = document.getElementById('gmKfDiamondToggle');
+    const hasKf = !!layer.transform?.keyframes?.location;
+    if (kfBtn) kfBtn.classList.toggle('active', hasKf);
+
+    // Color
+    const hexInput = document.getElementById('gmHexColorInput');
+    const colorPicker = document.getElementById('gmCustomColorPicker');
+    if (hexInput && layer.fillColor) hexInput.value = layer.fillColor;
+    if (colorPicker && layer.fillColor) colorPicker.value = layer.fillColor.slice(0, 7);
+
+    // Opacity
+    const opSlider = document.getElementById('gmOpacitySlider');
+    const opVal = document.getElementById('gmOpacityVal');
+    const op = layer.transform?.opacity !== undefined ? layer.transform.opacity : 1;
+    if (opSlider) opSlider.value = op;
+    if (opVal) opVal.textContent = `${Math.round(op * 100)}%`;
+
+    // Effects Stack List
+    this.renderEffectsStackList(layer);
+  }
+
+  renderEffectsStackList(layer) {
+    const list = document.getElementById('gmLayerEffectsList');
+    if (!list) return;
+
+    if (!layer.effects || layer.effects.length === 0) {
+      list.innerHTML = `<p style="font-size: 11.5px; color: var(--gm-text-muted); text-align: center; padding: 12px 0;">No effects applied. Tap [+ Add Effect] above to browse 930+ shaders.</p>`;
       return;
     }
 
-    // Render Layer Properties
-    const loc = layer.transform.location || [this.scene.width / 2, this.scene.height / 2];
-    const scale = layer.transform.scale || [1, 1];
-    const rot = layer.transform.rotation || 0;
-    const rotX = layer.transform.rotationX || 0;
-    const rotY = layer.transform.rotationY || 0;
-    const op = layer.transform.opacity !== undefined ? layer.transform.opacity : 1;
-
-    propPanel.innerHTML = `
-      <div class="gm-prop-header">
-        <span>${layer.label}</span>
-        <button class="gm-btn gm-btn-icon" id="gmDeleteLayerBtn" title="Delete Layer" style="color: var(--gm-accent-red);">✕</button>
-      </div>
-
-      <!-- Transform Controls -->
-      <div class="gm-prop-section">
-        <div class="gm-prop-title">
-          <span>Transform & Movement</span>
-          <div style="display: flex; gap: 4px;">
-            <button class="gm-btn" id="gmOpenGraphBtn" title="Open Bezier Graph Editor" style="padding: 3px 8px; font-size: 11px;">📈 Ease</button>
-            <button class="gm-btn" id="gmOpenExprBtn" title="Expression Editor" style="padding: 3px 8px; font-size: 11px;">⚡ Expr</button>
+    list.innerHTML = layer.effects
+      .map((eff, idx) => {
+        const name = eff.id.replace('com.alightcreative.effects.', '');
+        return `
+          <div class="gm-effect-stack-item">
+            <span>✨ ${name}</span>
+            <button class="gm-icon-btn" data-del-eff="${idx}" style="width: 28px; height: 28px; color: #ef4444;" title="Delete Effect">✕</button>
           </div>
-        </div>
+        `;
+      })
+      .join('');
 
-        <div class="gm-prop-row">
-          <span class="gm-prop-label">Position X / Y</span>
-          <div class="gm-prop-input-wrap">
-            <input type="number" class="gm-prop-input" id="gmPropPosX" value="${Math.round(loc[0])}">
-            <input type="number" class="gm-prop-input" id="gmPropPosY" value="${Math.round(loc[1])}">
-            <div class="gm-kf-toggle ${layer.transform.keyframes?.location ? 'active' : ''}" data-prop="location" title="Add / Remove Keyframe">◆</div>
-          </div>
-        </div>
-
-        <div class="gm-prop-row">
-          <span class="gm-prop-label">Scale X / Y</span>
-          <div class="gm-prop-input-wrap">
-            <input type="number" step="0.1" class="gm-prop-input" id="gmPropScaleX" value="${scale[0]}">
-            <input type="number" step="0.1" class="gm-prop-input" id="gmPropScaleY" value="${scale[1]}">
-            <div class="gm-kf-toggle ${layer.transform.keyframes?.scale ? 'active' : ''}" data-prop="scale" title="Add / Remove Keyframe">◆</div>
-          </div>
-        </div>
-
-        <div class="gm-prop-row">
-          <span class="gm-prop-label">2D Rotation (Angle)</span>
-          <div class="gm-prop-input-wrap">
-            <input type="number" class="gm-prop-input" id="gmPropRot" value="${rot}">
-            <div class="gm-kf-toggle ${layer.transform.keyframes?.rotation ? 'active' : ''}" data-prop="rotation" title="Add / Remove Keyframe">◆</div>
-          </div>
-        </div>
-
-        <div class="gm-prop-row">
-          <span class="gm-prop-label">3D Rotation X (Pitch)</span>
-          <div class="gm-prop-input-wrap">
-            <input type="number" class="gm-prop-input" id="gmPropRotX" value="${rotX}">
-            <div class="gm-kf-toggle ${layer.transform.keyframes?.rotationX ? 'active' : ''}" data-prop="rotationX" title="Add / Remove Keyframe">◆</div>
-          </div>
-        </div>
-
-        <div class="gm-prop-row">
-          <span class="gm-prop-label">3D Rotation Y (Yaw)</span>
-          <div class="gm-prop-input-wrap">
-            <input type="number" class="gm-prop-input" id="gmPropRotY" value="${rotY}">
-            <div class="gm-kf-toggle ${layer.transform.keyframes?.rotationY ? 'active' : ''}" data-prop="rotationY" title="Add / Remove Keyframe">◆</div>
-          </div>
-        </div>
-
-        <div class="gm-prop-row">
-          <span class="gm-prop-label">Opacity</span>
-          <div class="gm-prop-input-wrap">
-            <input type="range" min="0" max="1" step="0.05" class="gm-slider" id="gmPropOpacity" value="${op}" style="width: 80px;">
-            <div class="gm-kf-toggle ${layer.transform.keyframes?.opacity ? 'active' : ''}" data-prop="opacity" title="Add / Remove Keyframe">◆</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Content Properties -->
-      <div class="gm-prop-section">
-        <div class="gm-prop-title">Content & Styling</div>
-        ${layer.type === 'text' ? `
-          <div class="gm-prop-row">
-            <span class="gm-prop-label">Text</span>
-            <input type="text" class="gm-prop-input" id="gmPropTextContent" value="${layer.content || ''}" style="width: 140px; text-align: left;">
-          </div>
-          <div class="gm-prop-row">
-            <span class="gm-prop-label">Font Size</span>
-            <input type="number" class="gm-prop-input" id="gmPropTextSize" value="${layer.fontSize || 48}">
-          </div>
-        ` : ''}
-
-        <div class="gm-prop-row">
-          <span class="gm-prop-label">Fill Color</span>
-          <input type="color" id="gmPropColor" value="${layer.fillColor?.slice(0, 7) || '#f6c945'}" style="background: none; border: none; cursor: pointer; width: 36px; height: 32px;">
-        </div>
-      </div>
-
-      <!-- Effects Stack -->
-      <div class="gm-prop-section">
-        <div class="gm-prop-title">
-          <span>Effects Stack (${layer.effects?.length || 0})</span>
-          <button class="gm-btn gm-btn-gold" id="gmAddEffectBtn" style="padding: 3px 8px; font-size: 11px;">+ Add Effect</button>
-        </div>
-        <div id="gmEffectsList">
-          ${(layer.effects || []).map((eff, idx) => `
-            <div style="background: var(--gm-bg-card); border: 1px solid var(--gm-border-subtle); border-radius: 8px; padding: 10px; margin-bottom: 8px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                <span style="font-weight: 700; font-size: 12px; color: var(--gm-gold-primary);">${eff.id.replace('com.alightcreative.effects.', '')}</span>
-                <button class="gm-btn gm-btn-icon" data-del-eff="${idx}" style="width: 22px; height: 22px; padding: 0;">✕</button>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    `;
-
-    // Attach Property Listeners
-    this.bindPropertyInputs(layer);
-  }
-
-  bindPropertyInputs(layer) {
-    const posX = document.getElementById('gmPropPosX');
-    const posY = document.getElementById('gmPropPosY');
-    const scaleX = document.getElementById('gmPropScaleX');
-    const scaleY = document.getElementById('gmPropScaleY');
-    const rot = document.getElementById('gmPropRot');
-    const rotX = document.getElementById('gmPropRotX');
-    const rotY = document.getElementById('gmPropRotY');
-    const op = document.getElementById('gmPropOpacity');
-    const color = document.getElementById('gmPropColor');
-    const textContent = document.getElementById('gmPropTextContent');
-    const textSize = document.getElementById('gmPropTextSize');
-
-    const update = () => {
-      if (posX && posY) layer.transform.location = [parseFloat(posX.value) || 0, parseFloat(posY.value) || 0];
-      if (scaleX && scaleY) layer.transform.scale = [parseFloat(scaleX.value) || 1, parseFloat(scaleY.value) || 1];
-      if (rot) layer.transform.rotation = parseFloat(rot.value) || 0;
-      if (rotX) layer.transform.rotationX = parseFloat(rotX.value) || 0;
-      if (rotY) layer.transform.rotationY = parseFloat(rotY.value) || 0;
-      if (op) layer.transform.opacity = parseFloat(op.value);
-      if (color) layer.fillColor = color.value;
-      if (textContent) layer.content = textContent.value;
-      if (textSize) layer.fontSize = parseFloat(textSize.value) || 48;
-
-      this.storage.setUnsaved(true);
-      this.render();
-    };
-
-    [posX, posY, scaleX, scaleY, rot, rotX, rotY, op, color, textContent, textSize].forEach(el => {
-      el?.addEventListener('input', update);
-    });
-
-    // Delete Layer button
-    document.getElementById('gmDeleteLayerBtn')?.addEventListener('click', () => {
-      if (confirm(`Delete ${layer.label}?`)) {
-        this.scene.removeLayer(layer.id);
-        this.selectLayer(this.scene.layers[0]?.id || null);
-      }
-    });
-
-    // Keyframe Toggles
-    document.querySelectorAll('.gm-kf-toggle').forEach(t => {
-      t.addEventListener('click', () => {
-        const prop = t.dataset.prop;
-        const currVal = layer.transform[prop];
-        this.scene.addKeyframe(layer.id, prop, this.timeline.currentTime, currVal);
-        this.updateTimelineUI();
-        this.updatePropertiesUI();
+    list.querySelectorAll('[data-del-eff]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.delEff);
+        layer.effects.splice(idx, 1);
+        this.markUnexported();
+        this.renderEffectsStackList(layer);
         this.render();
       });
     });
+  }
 
-    // Graph editor button
-    document.getElementById('gmOpenGraphBtn')?.addEventListener('click', () => {
-      this.graphEditor.open();
+  setupPanTrackpad() {
+    const pad = document.getElementById('gmPanTrackpad');
+    if (!pad) return;
+
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let origLoc = [0, 0];
+
+    pad.addEventListener('pointerdown', (e) => {
+      const layer = this.scene?.getLayer(this.currentLayerId);
+      if (!layer) return;
+
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      origLoc = [...(layer.transform.location || [this.scene.width / 2, this.scene.height / 2])];
+      pad.setPointerCapture(e.pointerId);
     });
 
-    // Expression button
-    document.getElementById('gmOpenExprBtn')?.addEventListener('click', () => {
-      this.expressionDialog.open(layer);
+    pad.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      const layer = this.scene?.getLayer(this.currentLayerId);
+      if (!layer) return;
+
+      const dx = (e.clientX - startX) * 2;
+      const dy = (e.clientY - startY) * 2;
+
+      layer.transform.location = [origLoc[0] + dx, origLoc[1] + dy];
+
+      const posX = document.getElementById('gmTransformPosX');
+      const posY = document.getElementById('gmTransformPosY');
+      if (posX) posX.value = Math.round(layer.transform.location[0]);
+      if (posY) posY.value = Math.round(layer.transform.location[1]);
+
+      this.markUnexported();
+      this.render();
     });
 
-    // Add effect button
-    document.getElementById('gmAddEffectBtn')?.addEventListener('click', () => {
-      this.openEffectCatalogModal(layer);
+    const stopDrag = () => (isDragging = false);
+    pad.addEventListener('pointerup', stopDrag);
+    pad.addEventListener('pointercancel', stopDrag);
+  }
+
+  setupTransformSliders() {
+    const posX = document.getElementById('gmTransformPosX');
+    const posY = document.getElementById('gmTransformPosY');
+    const rotSlider = document.getElementById('gmSliderRotate');
+    const rotVal = document.getElementById('gmValRotate');
+    const scaleSlider = document.getElementById('gmSliderScale');
+    const scaleVal = document.getElementById('gmValScale');
+
+    const update = () => {
+      const layer = this.scene?.getLayer(this.currentLayerId);
+      if (!layer) return;
+
+      if (posX && posY) layer.transform.location = [parseFloat(posX.value) || 0, parseFloat(posY.value) || 0];
+      if (rotSlider) {
+        layer.transform.rotation = parseFloat(rotSlider.value) || 0;
+        if (rotVal) rotVal.textContent = `${Math.round(layer.transform.rotation)}°`;
+      }
+      if (scaleSlider) {
+        const s = parseFloat(scaleSlider.value) || 1;
+        layer.transform.scale = [s, s];
+        if (scaleVal) scaleVal.textContent = `${s.toFixed(1)}x`;
+      }
+
+      this.markUnexported();
+      this.render();
+    };
+
+    [posX, posY, rotSlider, scaleSlider].forEach((el) => el?.addEventListener('input', update));
+
+    // Diamond keyframe toggle
+    document.getElementById('gmKfDiamondToggle')?.addEventListener('click', () => {
+      this.toggleKeyframeAtCurrentTime();
+    });
+
+    // Graph & Expression buttons
+    document.getElementById('gmOpenCurveGraphBtn')?.addEventListener('click', () => {
+      this.graphEditor?.open();
+    });
+    document.getElementById('gmOpenExprDialogBtn')?.addEventListener('click', () => {
+      const layer = this.scene?.getLayer(this.currentLayerId);
+      if (layer) this.expressionDialog?.open(layer);
     });
   }
 
+  toggleKeyframeAtCurrentTime() {
+    const layer = this.scene?.getLayer(this.currentLayerId);
+    if (!layer) return;
+
+    const currLoc = layer.transform.location || [this.scene.width / 2, this.scene.height / 2];
+    this.scene.addKeyframe(layer.id, 'location', this.timeline.currentTime, currLoc);
+
+    this.markUnexported();
+    this.updateTimelineUI();
+    this.updatePropertiesUI();
+    this.render();
+  }
+
+  setupColorPalette() {
+    document.querySelectorAll('#gmPresetPalette .gm-color-swatch').forEach((swatch) => {
+      swatch.addEventListener('click', () => {
+        document.querySelectorAll('#gmPresetPalette .gm-color-swatch').forEach((s) => s.classList.remove('active'));
+        swatch.classList.add('active');
+
+        const col = swatch.dataset.color;
+        const layer = this.scene?.getLayer(this.currentLayerId);
+        if (layer) {
+          layer.fillColor = col;
+          const hexInput = document.getElementById('gmHexColorInput');
+          if (hexInput) hexInput.value = col;
+          this.markUnexported();
+          this.render();
+        }
+      });
+    });
+
+    document.getElementById('gmCustomColorPicker')?.addEventListener('input', (e) => {
+      const col = e.target.value;
+      const layer = this.scene?.getLayer(this.currentLayerId);
+      if (layer) {
+        layer.fillColor = col;
+        const hexInput = document.getElementById('gmHexColorInput');
+        if (hexInput) hexInput.value = col;
+        this.markUnexported();
+        this.render();
+      }
+    });
+
+    document.getElementById('gmHexColorInput')?.addEventListener('change', (e) => {
+      const col = e.target.value;
+      const layer = this.scene?.getLayer(this.currentLayerId);
+      if (layer) {
+        layer.fillColor = col;
+        this.markUnexported();
+        this.render();
+      }
+    });
+  }
+
+  setupBorderAndShadow() {
+    const slider = document.getElementById('gmStrokeWidthSlider');
+    const valText = document.getElementById('gmStrokeWidthVal');
+    const colorPicker = document.getElementById('gmStrokeColorPicker');
+    const shadowToggle = document.getElementById('gmShadowToggle');
+
+    slider?.addEventListener('input', (e) => {
+      const layer = this.scene?.getLayer(this.currentLayerId);
+      if (layer) {
+        layer.strokeWidth = parseFloat(e.target.value) || 0;
+        if (valText) valText.textContent = `${layer.strokeWidth}px`;
+        this.markUnexported();
+        this.render();
+      }
+    });
+
+    colorPicker?.addEventListener('input', (e) => {
+      const layer = this.scene?.getLayer(this.currentLayerId);
+      if (layer) {
+        layer.strokeColor = e.target.value;
+        this.markUnexported();
+        this.render();
+      }
+    });
+
+    shadowToggle?.addEventListener('change', (e) => {
+      const layer = this.scene?.getLayer(this.currentLayerId);
+      if (layer) {
+        layer.shadow = e.target.checked;
+        this.markUnexported();
+        this.render();
+      }
+    });
+  }
+
+  setupBlendingAndOpacity() {
+    const blendSelect = document.getElementById('gmBlendModeSelect');
+    const opSlider = document.getElementById('gmOpacitySlider');
+    const opVal = document.getElementById('gmOpacityVal');
+
+    blendSelect?.addEventListener('change', (e) => {
+      const layer = this.scene?.getLayer(this.currentLayerId);
+      if (layer) {
+        layer.blendMode = e.target.value;
+        this.markUnexported();
+        this.render();
+      }
+    });
+
+    opSlider?.addEventListener('input', (e) => {
+      const layer = this.scene?.getLayer(this.currentLayerId);
+      if (layer) {
+        layer.transform.opacity = parseFloat(e.target.value);
+        if (opVal) opVal.textContent = `${Math.round(layer.transform.opacity * 100)}%`;
+        this.markUnexported();
+        this.render();
+      }
+    });
+  }
+
+  // ==========================================================
+  // ADD LAYER SHEET (activity_edit_addpopup.xml)
+  // ==========================================================
+  openAddLayerSheet() {
+    document.getElementById('gmAddPopup')?.classList.add('active');
+  }
+
+  closeAddLayerSheet() {
+    document.getElementById('gmAddPopup')?.classList.remove('active');
+  }
+
+  populateShapesGrid() {
+    const grid = document.getElementById('gmShapesGrid');
+    if (!grid) return;
+
+    const shapes = [
+      { id: 'rect', name: 'Rectangle', svg: '<rect x="3" y="6" width="22" height="16" rx="2"/>' },
+      { id: 'round_rect', name: 'Round Rect', svg: '<rect x="3" y="6" width="22" height="16" rx="6"/>' },
+      { id: 'circle', name: 'Circle', svg: '<circle cx="14" cy="14" r="11"/>' },
+      { id: 'star', name: 'Star', svg: '<polygon points="14,2 17.5,9.5 25,10.5 19.5,15.5 21,23 14,19 7,23 8.5,15.5 3,10.5 10.5,9.5"/>' },
+      { id: 'triangle', name: 'Triangle', svg: '<polygon points="14,3 25,23 3,23"/>' },
+      { id: 'polygon', name: 'Hexagon', svg: '<polygon points="14,2 24,7.5 24,18.5 14,24 4,18.5 4,7.5"/>' },
+      { id: 'heart', name: 'Heart', svg: '<path d="M14,23 C8,18 2,13 2,7 C2,3 5,1 8,1 C11,1 13,3 14,5 C15,3 17,1 20,1 C23,1 26,3 26,7 C26,13 20,18 14,23 Z"/>' },
+      { id: 'arrow', name: 'Arrow', svg: '<polygon points="14,2 25,13 18,13 18,24 10,24 10,13 3,13"/>' }
+    ];
+
+    grid.innerHTML = shapes
+      .map(
+        (s) => `
+        <div class="gm-shape-card" data-shape-type="${s.id}">
+          <svg viewBox="0 0 28 26">${s.svg}</svg>
+          <span>${s.name}</span>
+        </div>
+      `
+      )
+      .join('');
+
+    grid.querySelectorAll('.gm-shape-card').forEach((card) => {
+      card.addEventListener('click', () => {
+        const type = card.dataset.shapeType;
+        this.addShapeLayer(type);
+        this.closeAddLayerSheet();
+      });
+    });
+  }
+
+  addShapeLayer(shapeType) {
+    if (!this.scene) return;
+    const l = this.scene.createLayer('shape', {
+      label: `${shapeType.toUpperCase()}`,
+      shapeType,
+      tag: 'gold',
+      fillColor: '#f6c945',
+      location: [this.scene.width / 2, this.scene.height / 2],
+      scale: [1, 1],
+      rotation: 0
+    });
+    this.scene.addLayer(l);
+    this.selectLayer(l.id);
+    this.markUnexported();
+    this.render();
+  }
+
+  addTextLayer() {
+    if (!this.scene) return;
+    const l = this.scene.createLayer('text', {
+      label: 'Text Layer',
+      content: 'GOLD MOTION',
+      fontSize: 64,
+      font: 'Audiowide',
+      fillColor: '#ffffff',
+      location: [this.scene.width / 2, this.scene.height / 2],
+      scale: [1, 1],
+      rotation: 0
+    });
+    this.scene.addLayer(l);
+    this.selectLayer(l.id);
+    this.markUnexported();
+    this.render();
+  }
+
+  addCameraLayer() {
+    if (!this.scene) return;
+    const l = this.scene.createLayer('camera', {
+      label: 'Camera 1',
+      tag: 'blue',
+      fov: 45
+    });
+    this.scene.addLayer(l);
+    this.selectLayer(l.id);
+    this.markUnexported();
+    this.render();
+  }
+
+  addNullLayer() {
+    if (!this.scene) return;
+    const l = this.scene.createLayer('null', {
+      label: 'Null 1',
+      tag: 'purple'
+    });
+    this.scene.addLayer(l);
+    this.selectLayer(l.id);
+    this.markUnexported();
+    this.render();
+  }
+
+  addLightLayer() {
+    if (!this.scene) return;
+    const l = this.scene.createLayer('light', {
+      label: 'Point Light',
+      tag: 'gold',
+      intensity: 1.5,
+      lightColor: '#ffea88'
+    });
+    this.scene.addLayer(l);
+    this.selectLayer(l.id);
+    this.markUnexported();
+    this.render();
+  }
+
+  addGroupLayer() {
+    if (!this.scene) return;
+    const l = this.scene.createLayer('group', {
+      label: 'Group 1',
+      tag: 'green'
+    });
+    this.scene.addLayer(l);
+    this.selectLayer(l.id);
+    this.markUnexported();
+    this.render();
+  }
+
+  handleMediaUpload(file) {
+    if (!file || !this.scene) return;
+    const url = URL.createObjectURL(file);
+    const isVideo = file.type.startsWith('video');
+
+    const l = this.scene.createLayer(isVideo ? 'video' : 'image', {
+      label: file.name.slice(0, 16),
+      src: url,
+      location: [this.scene.width / 2, this.scene.height / 2],
+      scale: [1, 1],
+      rotation: 0
+    });
+    this.scene.addLayer(l);
+    this.selectLayer(l.id);
+    this.closeAddLayerSheet();
+    this.markUnexported();
+    this.render();
+  }
+
+  handleAudioUpload(file) {
+    if (!file || !this.scene) return;
+    const url = URL.createObjectURL(file);
+    const l = this.scene.createLayer('audio', {
+      label: file.name.slice(0, 16),
+      src: url,
+      startTime: 0,
+      endTime: this.scene.totalTime
+    });
+    this.scene.addLayer(l);
+    this.selectLayer(l.id);
+    this.closeAddLayerSheet();
+    this.markUnexported();
+    this.render();
+  }
+
+  // ==========================================================
+  // EFFECT CATALOG MODAL (930+ Shaders)
+  // ==========================================================
   openEffectCatalogModal(layer) {
     const modal = document.getElementById('gmEffectCatalogModal');
     if (!modal) return;
@@ -628,27 +1472,33 @@ class GoldMotionApp {
     const searchInput = document.getElementById('gmCatalogSearch');
 
     const renderEffects = (query = '') => {
-      const list = this.effectPipeline.searchEffects(query).slice(0, 60);
-      listContainer.innerHTML = list.map(eff => `
-        <div class="gm-tool-card" data-eff-id="${eff.id}" style="padding: 12px; cursor: pointer;">
-          <div style="display: flex; gap: 10px; align-items: center;">
-            <div style="width: 36px; height: 36px; border-radius: 8px; background: rgba(246,201,69,0.15); display: grid; place-items: center; color: var(--gm-gold-primary); font-weight: 800; font-size: 13px;">
+      const list = this.effectPipeline.searchEffects(query).slice(0, 70);
+      listContainer.innerHTML = list
+        .map(
+          (eff) => `
+        <div class="gm-project-card" data-eff-id="${eff.id}" style="padding: 10px; cursor: pointer;">
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <div style="width: 32px; height: 32px; border-radius: 6px; background: rgba(246,201,69,0.15); display: grid; place-items: center; color: var(--gm-gold-primary); font-weight: 800; font-size: 11px;">
               FX
             </div>
             <div style="flex: 1; overflow: hidden;">
-              <h4 style="font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${eff.name}</h4>
-              <span style="font-size: 10.5px; color: var(--gm-text-muted);">${eff.category}</span>
+              <h4 style="font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #fff;">${eff.name}</h4>
+              <span style="font-size: 10px; color: var(--gm-text-muted);">${eff.category}</span>
             </div>
           </div>
         </div>
-      `).join('');
+      `
+        )
+        .join('');
 
-      listContainer.querySelectorAll('[data-eff-id]').forEach(card => {
+      listContainer.querySelectorAll('[data-eff-id]').forEach((card) => {
         card.addEventListener('click', () => {
-          const id = card.dataset.eff_id;
+          const id = card.dataset.effId;
+          layer.effects = layer.effects || [];
           layer.effects.push({ id, params: {} });
           modal.classList.remove('active');
-          this.updatePropertiesUI();
+          this.markUnexported();
+          this.renderEffectsStackList(layer);
           this.render();
         });
       });
@@ -656,129 +1506,36 @@ class GoldMotionApp {
 
     renderEffects('');
     searchInput?.addEventListener('input', (e) => renderEffects(e.target.value));
-
     document.getElementById('gmCatalogClose')?.addEventListener('click', () => modal.classList.remove('active'));
   }
 
   onCurveApplied(curveStr) {
-    if (!this.currentLayerId || !this.scene) return;
-    const layer = this.scene.getLayer(this.currentLayerId);
-    if (layer && layer.transform.keyframes?.rotation) {
-      for (const kf of layer.transform.keyframes.rotation) {
+    const layer = this.scene?.getLayer(this.currentLayerId);
+    if (layer?.transform?.keyframes?.location) {
+      for (const kf of layer.transform.keyframes.location) {
         kf.e = curveStr;
       }
     }
+    this.markUnexported();
     this.updateTimelineUI();
     this.render();
   }
 
   onExpressionApplied(prop, code, fps) {
-    if (!this.currentLayerId || !this.scene) return;
-    const layer = this.scene.getLayer(this.currentLayerId);
+    const layer = this.scene?.getLayer(this.currentLayerId);
     if (layer) {
       import('./expressions/ExpressionEngine.js').then(({ ExpressionEngine }) => {
         ExpressionEngine.bakeKeyframes(layer, prop, code, fps);
+        this.markUnexported();
         this.updateTimelineUI();
         this.updatePropertiesUI();
         this.render();
       });
     }
   }
-
-  bindEditorControls() {
-    // Play button
-    document.getElementById('gmPlayBtn')?.addEventListener('click', () => {
-      this.timeline.toggle();
-    });
-
-    // Transport buttons
-    document.getElementById('gmPrevKfBtn')?.addEventListener('click', () => {
-      this.timeline.seekFrame(-1);
-    });
-    document.getElementById('gmNextKfBtn')?.addEventListener('click', () => {
-      this.timeline.seekFrame(1);
-    });
-
-    // Timeline Scrubbing
-    const ruler = document.getElementById('gmRuler');
-    if (ruler) {
-      let isScrubbing = false;
-      const scrub = (e) => {
-        const rect = ruler.getBoundingClientRect();
-        const p = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-        this.timeline.seek(p * this.timeline.totalTime);
-      };
-
-      ruler.addEventListener('pointerdown', (e) => {
-        isScrubbing = true;
-        scrub(e);
-      });
-      window.addEventListener('pointermove', (e) => {
-        if (isScrubbing) scrub(e);
-      });
-      window.addEventListener('pointerup', () => isScrubbing = false);
-    }
-
-    // Header Nav & Brand
-    document.getElementById('gmHeaderBrand')?.addEventListener('click', () => this.switchPage('home'));
-    document.getElementById('gmHeaderNavHome')?.addEventListener('click', () => this.switchPage('home'));
-    document.getElementById('gmHeaderNavEditor')?.addEventListener('click', () => this.switchPage('editor'));
-    document.getElementById('gmHeaderNavTools')?.addEventListener('click', () => this.switchPage('tools'));
-
-    // Home Quick Action Cards
-    document.getElementById('gmHomeNewProject')?.addEventListener('click', () => this.createModal.open());
-    document.getElementById('gmHomeOpenEditor')?.addEventListener('click', () => this.switchPage('editor'));
-    document.getElementById('gmHomeOpenLabs')?.addEventListener('click', () => this.switchPage('labs'));
-    document.getElementById('gmHomeOpenTools')?.addEventListener('click', () => this.switchPage('tools'));
-    document.getElementById('gmHomeOpenTemplates')?.addEventListener('click', () => this.switchPage('templates'));
-    document.getElementById('gmBackupNowBtn')?.addEventListener('click', () => this.storage.downloadFullBackup());
-    document.getElementById('gmViewAllFxLink')?.addEventListener('click', () => {
-      if (this.scene && this.scene.layers.length > 0) {
-        this.openEffectCatalogModal(this.scene.layers[0]);
-      } else {
-        this.switchPage('tools');
-      }
-    });
-
-    // Editor Topbar Buttons
-    document.getElementById('gmEditorBackBtn')?.addEventListener('click', () => this.switchPage('home'));
-    document.getElementById('gmTogglePropsBtn')?.addEventListener('click', () => {
-      document.getElementById('gmPropertiesPanel')?.classList.toggle('open');
-    });
-
-    // Top Header Buttons
-    document.getElementById('gmExportHeaderBtn')?.addEventListener('click', () => {
-      this.exportDialog.open();
-    });
-
-    document.getElementById('gmSaveBackupBtn')?.addEventListener('click', () => {
-      this.storage.downloadFullBackup();
-    });
-
-    document.getElementById('gmXmlImportInput')?.addEventListener('change', async (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const text = await file.text();
-        const scene = XmlHandler.parse(text);
-        await this.storage.saveProject(scene);
-        this.loadScene(scene);
-        this.switchPage('editor');
-      }
-    });
-
-    // Add Layer Button
-    document.getElementById('gmAddLayerBtn')?.addEventListener('click', () => {
-      const type = prompt('Add Layer Type: "shape", "text", "media"', 'shape');
-      if (type && this.scene) {
-        const l = this.scene.createLayer(type.toLowerCase());
-        this.scene.addLayer(l);
-        this.selectLayer(l.id);
-      }
-    });
-  }
 }
 
-// Boot Gold Motion when DOM is ready
+// Boot Gold Motion when DOM is loaded
 window.addEventListener('DOMContentLoaded', () => {
   window.goldMotionApp = new GoldMotionApp();
 });

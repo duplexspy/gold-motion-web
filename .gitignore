@@ -5,8 +5,11 @@ package-lock.json
 # APK binaries & extraction artifacts (exceeds GitHub 100MB limit)
 base.apk
 extracted_apk/
+apktool.jar
+decompiled_apk/
 
 # Logs & temp files
 *.log
 .DS_Store
 Thumbs.db
+
