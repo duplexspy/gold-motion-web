@@ -570,11 +570,14 @@
           </div>
         </div>
 
-        <!-- Panel 5: Effects (+ Add Effect) -->
+        <!-- Panel 5: Effects (+ Add Effect & Add XML Effect) -->
         <div class="gm-drawer-panel" id="gmPanelEffects">
           <div class="gm-effects-stack-header">
             <span>Applied Effects</span>
-            <button class="gm-btn gm-btn-gold" id="gmOpenAddEffectModalBtn">+ Add Effect</button>
+            <div style="display: flex; gap: 8px;">
+              <button class="gm-btn gm-btn-gold" id="gmOpenAddEffectModalBtn">+ Add Effect</button>
+              <button class="gm-btn" id="gmAddCustomXmlEffectBtn" title="Import or Paste Custom XML Effect">📥 Add XML Effect</button>
+            </div>
           </div>
           <div class="gm-effects-stack-list" id="gmLayerEffectsList">
             <!-- Active effects rendered dynamically -->
@@ -829,24 +832,114 @@
   <div id="gmCreateModalMount" style="display: none;"></div>
   <div id="gmNavMount" style="display: none;"></div>
 
-  <!-- Effect Catalog Modal (930+ Presets) -->
+  <!-- Effect Catalog Modal (930+ Presets & Custom XML) -->
   <div id="gmEffectCatalogModal" class="gm-modal-scrim">
-    <div class="gm-modal-card" style="max-width: 680px; height: 80vh;">
+    <div class="gm-modal-card" style="max-width: 720px; height: 85vh;">
       <div class="gm-modal-header">
         <div style="display: flex; align-items: center; gap: 8px;">
           <span style="font-size: 20px;">✨</span>
           <div>
             <h3 style="font-size: 16px;">Effects Catalog (930+ Shaders)</h3>
-            <p style="font-size: 11px; color: var(--gm-gold-primary); font-weight: 700;">Native Gold Motion GPU Shaders &amp; Shaders</p>
+            <p style="font-size: 11px; color: var(--gm-gold-primary); font-weight: 700;">Native Gold Motion GPU Shaders &amp; Custom Presets</p>
           </div>
         </div>
-        <button class="gm-icon-btn" id="gmCatalogClose">✕</button>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button class="gm-btn gm-btn-gold" id="gmCatalogImportXmlBtn" title="Add Custom XML Effect">📥 Add XML Effect</button>
+          <button class="gm-icon-btn" id="gmCatalogClose">✕</button>
+        </div>
       </div>
-      <div style="padding: 12px 16px; border-bottom: 1px solid var(--gm-border-subtle);">
-        <input type="text" id="gmCatalogSearch" placeholder="Search 930+ effects (e.g. 24K Gold, Blur, Glitch, RGB Split, Wave)…" class="gm-search-input">
+      <!-- Category Filter Pills -->
+      <div class="gm-catalog-cat-row" id="gmCatalogCatRow">
+        <button class="gm-cat-pill active" data-cat="all">All (930+)</button>
+        <button class="gm-cat-pill gm-cat-pill-gold" data-cat="custom_xml">⭐ Custom XML</button>
+        <button class="gm-cat-pill" data-cat="blur">Blur</button>
+        <button class="gm-cat-pill" data-cat="color">Color</button>
+        <button class="gm-cat-pill" data-cat="distort">Distort</button>
+        <button class="gm-cat-pill" data-cat="procedural">Procedural</button>
+        <button class="gm-cat-pill" data-cat="drawing">Drawing</button>
+        <button class="gm-cat-pill" data-cat="transform">3D / Motion</button>
+      </div>
+      <div style="padding: 10px 16px; border-bottom: 1px solid var(--gm-border-subtle);">
+        <input type="text" id="gmCatalogSearch" placeholder="Search 930+ effects (e.g. Advanced Sharpen, Shake, Glitch, Glow, Blur)…" class="gm-search-input">
       </div>
       <div class="gm-modal-body" style="flex: 1; overflow-y: auto; padding: 16px;">
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px;" id="gmCatalogList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 9. ADD CUSTOM XML EFFECT MODAL -->
+  <!-- ======================================================== -->
+  <div class="gm-modal-scrim" id="gmCustomXmlModal">
+    <div class="gm-modal-card" style="max-width: 580px; max-height: 90vh;">
+      <div class="gm-modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 22px;">📜</span>
+          <div>
+            <h3 style="font-size: 16px;">Add Custom XML Effect</h3>
+            <p style="font-size: 11px; color: var(--gm-gold-primary); font-weight: 700;">Import Alight Motion &amp; Gold Motion Effect XML</p>
+          </div>
+        </div>
+        <button class="gm-icon-btn" id="gmCustomXmlClose">✕</button>
+      </div>
+
+      <div class="gm-modal-body" style="padding: 18px; overflow-y: auto;">
+        
+        <!-- Tab selector: Upload File vs Paste XML -->
+        <div class="gm-pill-selector" style="margin-bottom: 14px;">
+          <button class="active" id="gmTabXmlUpload" type="button">📁 Upload .xml File</button>
+          <button id="gmTabXmlPaste" type="button">✏️ Paste XML Code</button>
+        </div>
+
+        <!-- Section 1: File Upload Dropzone -->
+        <div id="gmXmlUploadSection">
+          <label class="gm-file-dropzone" for="gmCustomXmlFileInput" style="height: 130px; cursor: pointer;">
+            <span style="font-size: 32px; margin-bottom: 6px;">📥</span>
+            <span style="font-size: 14px; font-weight: 700; color: var(--gm-gold-primary);">Select or Drag &amp; Drop XML File</span>
+            <p style="font-size: 11px; color: var(--gm-text-muted); margin-top: 4px;">Supports Alight &amp; Gold Motion XML effect files and shaders</p>
+            <input type="file" id="gmCustomXmlFileInput" accept=".xml,.amproject" style="display: none;">
+          </label>
+          <div id="gmXmlSelectedFileInfo" style="display: none; margin-top: 8px; font-size: 12px; color: var(--gm-gold-primary); font-weight: 700;"></div>
+        </div>
+
+        <!-- Section 2: Code Editor Textarea -->
+        <div id="gmXmlPasteSection" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <label style="font-size: 12px; font-weight: 700; color: var(--gm-text-muted);">Paste Effect XML Code:</label>
+            <button class="gm-mini-btn" id="gmClearXmlCodeBtn" type="button">Clear</button>
+          </div>
+          <textarea id="gmCustomXmlCodeInput" class="gm-code-textarea" rows="7" placeholder="<effect id=&quot;com.alightcreative.effects.glow&quot;>\n  <property id=&quot;radius&quot; value=&quot;15.0&quot; />\n  <property id=&quot;alpha&quot; value=&quot;0.8&quot; />\n</effect>"></textarea>
+        </div>
+
+        <!-- Sample XML Preset Buttons -->
+        <div style="margin-top: 14px;">
+          <span style="font-size: 11.5px; font-weight: 700; color: var(--gm-text-muted); display: block; margin-bottom: 6px;">Or load APK Custom XML Presets:</span>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;" id="gmXmlPresetSampleChips">
+            <button class="gm-mini-btn" data-preset-xml="advsharpen" type="button">⚡ Advanced Sharpen</button>
+            <button class="gm-mini-btn" data-preset-xml="gm_shake" type="button">📳 GM Camera Shake</button>
+            <button class="gm-mini-btn" data-preset-xml="gm_chromatic" type="button">🌈 Chromatic Heat Warp</button>
+            <button class="gm-mini-btn" data-preset-xml="liquid_glass" type="button">💧 Liquid Glass</button>
+          </div>
+        </div>
+
+        <!-- Options checkboxes -->
+        <div style="margin-top: 16px; display: flex; flex-direction: column; gap: 8px;">
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; cursor: pointer;">
+            <input type="checkbox" id="gmApplyToLayerCheck" checked>
+            <span>Apply to currently selected layer immediately</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; cursor: pointer;">
+            <input type="checkbox" id="gmSaveToLibraryCheck" checked>
+            <span>Save to Custom XML Effects Library (reusable anytime)</span>
+          </label>
+        </div>
+
+      </div>
+
+      <div class="gm-modal-footer" style="padding: 12px 18px; border-top: 1px solid var(--gm-border-subtle); display: flex; justify-content: flex-end; gap: 10px; background: #161824;">
+        <button class="gm-btn" id="gmCustomXmlCancel" type="button">Cancel</button>
+        <button class="gm-btn gm-btn-gold" id="gmCustomXmlSubmit" type="button">⚡ Apply Custom XML Effect</button>
       </div>
     </div>
   </div>

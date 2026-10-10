@@ -142,6 +142,7 @@ export class Renderer {
   }
 
   drawShapeLayer(ctx, layer) {
+    ctx.save();
     let fillStyle = layer.fillColor || '#f6c945';
     if (layer.fillType === 'gradient' && layer.gradient) {
       const g = layer.gradient;

@@ -636,6 +636,9 @@ class GoldMotionApp {
       const layer = this.scene?.getLayer(this.currentLayerId);
       if (layer) this.openEffectCatalogModal(layer);
     });
+
+    // Custom XML Effects Modal & Importer
+    this.setupCustomXmlModal();
   }
 
   switchMainTab(tab) {
@@ -1064,16 +1067,22 @@ class GoldMotionApp {
     if (!list) return;
 
     if (!layer.effects || layer.effects.length === 0) {
-      list.innerHTML = `<p style="font-size: 11.5px; color: var(--gm-text-muted); text-align: center; padding: 12px 0;">No effects applied. Tap [+ Add Effect] above to browse 930+ shaders.</p>`;
+      list.innerHTML = `<p style="font-size: 11.5px; color: var(--gm-text-muted); text-align: center; padding: 12px 0;">No effects applied. Tap [+ Add Effect] or [📥 Add XML Effect] above.</p>`;
       return;
     }
 
     list.innerHTML = layer.effects
       .map((eff, idx) => {
-        const name = eff.id.replace('com.alightcreative.effects.', '');
+        const effDef = this.effectPipeline.getEffect(eff.id);
+        const isCustom = eff.isCustomXml || effDef?.isCustomXml;
+        let displayName = effDef ? effDef.name : eff.id.replace('com.alightcreative.effects.', '').replace('com.goldmotion.custom.', '');
         return `
           <div class="gm-effect-stack-item">
-            <span>✨ ${name}</span>
+            <span style="display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              <span>${isCustom ? '⭐' : '✨'}</span>
+              <strong style="color: ${isCustom ? 'var(--gm-gold-primary)' : '#fff'}; font-size: 12px;">${displayName}</strong>
+              ${isCustom ? '<span style="font-size: 9px; padding: 1px 5px; border-radius: 3px; background: rgba(246,201,69,0.2); color: var(--gm-gold-primary); font-weight: 700; border: 1px solid rgba(246,201,69,0.4);">XML</span>' : ''}
+            </span>
             <button class="gm-icon-btn" data-del-eff="${idx}" style="width: 28px; height: 28px; color: #ef4444;" title="Delete Effect">✕</button>
           </div>
         `;
@@ -1470,43 +1479,309 @@ class GoldMotionApp {
 
     const listContainer = document.getElementById('gmCatalogList');
     const searchInput = document.getElementById('gmCatalogSearch');
+    const catRow = document.getElementById('gmCatalogCatRow');
 
-    const renderEffects = (query = '') => {
-      const list = this.effectPipeline.searchEffects(query).slice(0, 70);
-      listContainer.innerHTML = list
-        .map(
-          (eff) => `
-        <div class="gm-project-card" data-eff-id="${eff.id}" style="padding: 10px; cursor: pointer;">
-          <div style="display: flex; gap: 8px; align-items: center;">
-            <div style="width: 32px; height: 32px; border-radius: 6px; background: rgba(246,201,69,0.15); display: grid; place-items: center; color: var(--gm-gold-primary); font-weight: 800; font-size: 11px;">
-              FX
-            </div>
-            <div style="flex: 1; overflow: hidden;">
-              <h4 style="font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #fff;">${eff.name}</h4>
-              <span style="font-size: 10px; color: var(--gm-text-muted);">${eff.category}</span>
-            </div>
+    let currentCategory = 'all';
+
+    const renderEffects = (query = '', cat = currentCategory) => {
+      const list = this.effectPipeline.searchEffects(query, cat).slice(0, 80);
+      if (list.length === 0) {
+        listContainer.innerHTML = `
+          <div style="grid-column: 1 / -1; text-align: center; color: var(--gm-text-muted); padding: 36px 16px;">
+            <p style="font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 6px;">No effects found</p>
+            <p style="font-size: 12px; margin-bottom: 14px;">Try searching for something else or import a custom XML effect file.</p>
+            <button class="gm-btn gm-btn-gold" id="gmCatalogEmptyImportBtn" style="display: inline-block;">📥 Add XML Effect</button>
           </div>
-        </div>
-      `
-        )
+        `;
+        document.getElementById('gmCatalogEmptyImportBtn')?.addEventListener('click', () => {
+          modal.classList.remove('active');
+          document.getElementById('gmCustomXmlModal')?.classList.add('active');
+        });
+        return;
+      }
+
+      listContainer.innerHTML = list
+        .map((eff) => {
+          const isCustom = eff.isCustomXml || eff.category === 'custom_xml';
+          return `
+            <div class="gm-project-card" data-eff-id="${eff.id}" style="padding: 10px; cursor: pointer; border: ${isCustom ? '1px solid rgba(246, 201, 69, 0.45)' : '1px solid var(--gm-border-subtle)'}; background: ${isCustom ? 'rgba(246, 201, 69, 0.06)' : ''};">
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <div style="width: 32px; height: 32px; border-radius: 6px; background: ${isCustom ? 'rgba(246,201,69,0.25)' : 'rgba(246,201,69,0.15)'}; display: grid; place-items: center; color: var(--gm-gold-primary); font-weight: 800; font-size: ${isCustom ? '13px' : '11px'};">
+                  ${isCustom ? '⭐' : 'FX'}
+                </div>
+                <div style="flex: 1; overflow: hidden;">
+                  <h4 style="font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #fff;">${eff.name}</h4>
+                  <span style="font-size: 10px; color: ${isCustom ? 'var(--gm-gold-primary)' : 'var(--gm-text-muted)'}; font-weight: ${isCustom ? '700' : '400'};">${eff.category || 'Effect'}${isCustom ? ' • Custom XML' : ''}</span>
+                </div>
+              </div>
+            </div>
+          `;
+        })
         .join('');
 
       listContainer.querySelectorAll('[data-eff-id]').forEach((card) => {
         card.addEventListener('click', () => {
           const id = card.dataset.effId;
-          layer.effects = layer.effects || [];
-          layer.effects.push({ id, params: {} });
-          modal.classList.remove('active');
-          this.markUnexported();
-          this.renderEffectsStackList(layer);
-          this.render();
+          const targetLayer = this.scene?.getLayer(this.currentLayerId) || layer;
+          if (targetLayer) {
+            targetLayer.effects = targetLayer.effects || [];
+            const effDef = this.effectPipeline.getEffect(id);
+            targetLayer.effects.push({
+              id,
+              isCustomXml: !!effDef?.isCustomXml,
+              params: {}
+            });
+            modal.classList.remove('active');
+            this.markUnexported();
+            this.renderEffectsStackList(targetLayer);
+            this.render();
+          }
         });
       });
     };
 
-    renderEffects('');
-    searchInput?.addEventListener('input', (e) => renderEffects(e.target.value));
-    document.getElementById('gmCatalogClose')?.addEventListener('click', () => modal.classList.remove('active'));
+    // Category pills click handler
+    if (catRow) {
+      catRow.querySelectorAll('.gm-cat-pill').forEach((pill) => {
+        pill.onclick = () => {
+          catRow.querySelectorAll('.gm-cat-pill').forEach((p) => p.classList.remove('active'));
+          pill.classList.add('active');
+          currentCategory = pill.dataset.cat || 'all';
+          renderEffects(searchInput?.value || '', currentCategory);
+        };
+      });
+    }
+
+    renderEffects('', currentCategory);
+
+    if (searchInput) {
+      searchInput.value = '';
+      searchInput.oninput = (e) => renderEffects(e.target.value, currentCategory);
+    }
+
+    const closeBtn = document.getElementById('gmCatalogClose');
+    if (closeBtn) closeBtn.onclick = () => modal.classList.remove('active');
+
+    const importBtn = document.getElementById('gmCatalogImportXmlBtn');
+    if (importBtn) {
+      importBtn.onclick = () => {
+        document.getElementById('gmCustomXmlModal')?.classList.add('active');
+      };
+    }
+  }
+
+  // ==========================================================
+  // CUSTOM XML EFFECT MODAL SYSTEM
+  // ==========================================================
+  setupCustomXmlModal() {
+    const modal = document.getElementById('gmCustomXmlModal');
+    if (!modal) return;
+
+    const fileInput = document.getElementById('gmCustomXmlFileInput');
+    const fileInfo = document.getElementById('gmXmlSelectedFileInfo');
+    const codeInput = document.getElementById('gmCustomXmlCodeInput');
+    const tabUpload = document.getElementById('gmTabXmlUpload');
+    const tabPaste = document.getElementById('gmTabXmlPaste');
+    const uploadSection = document.getElementById('gmXmlUploadSection');
+    const pasteSection = document.getElementById('gmXmlPasteSection');
+    const clearBtn = document.getElementById('gmClearXmlCodeBtn');
+    const submitBtn = document.getElementById('gmCustomXmlSubmit');
+    const cancelBtn = document.getElementById('gmCustomXmlCancel');
+    const closeBtn = document.getElementById('gmCustomXmlClose');
+    const applyCheck = document.getElementById('gmApplyToLayerCheck');
+    const saveCheck = document.getElementById('gmSaveToLibraryCheck');
+    const presetChips = document.getElementById('gmXmlPresetSampleChips');
+
+    let currentXmlContent = '';
+    let currentFileName = '';
+
+    const openModal = () => {
+      modal.classList.add('active');
+    };
+
+    const closeModal = () => {
+      modal.classList.remove('active');
+    };
+
+    // Open button from layer drawer
+    document.getElementById('gmAddCustomXmlEffectBtn')?.addEventListener('click', () => {
+      openModal();
+    });
+
+    // Close buttons
+    closeBtn?.addEventListener('click', closeModal);
+    cancelBtn?.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+
+    // Tab switching
+    tabUpload?.addEventListener('click', () => {
+      tabUpload.classList.add('active');
+      tabPaste?.classList.remove('active');
+      if (uploadSection) uploadSection.style.display = 'block';
+      if (pasteSection) pasteSection.style.display = 'none';
+    });
+
+    tabPaste?.addEventListener('click', () => {
+      tabPaste.classList.add('active');
+      tabUpload?.classList.remove('active');
+      if (uploadSection) uploadSection.style.display = 'none';
+      if (pasteSection) pasteSection.style.display = 'block';
+      codeInput?.focus();
+    });
+
+    // Dropzone and file input handlers
+    const handleFileLoaded = (file) => {
+      if (!file) return;
+      currentFileName = file.name;
+      const reader = new FileReader();
+      reader.onload = (re) => {
+        currentXmlContent = re.target.result;
+        if (codeInput) codeInput.value = currentXmlContent;
+        if (fileInfo) {
+          fileInfo.textContent = `📄 Loaded: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+          fileInfo.style.display = 'block';
+        }
+      };
+      reader.readAsText(file);
+    };
+
+    fileInput?.addEventListener('change', (e) => {
+      handleFileLoaded(e.target.files?.[0]);
+    });
+
+    const dropzone = modal.querySelector('.gm-file-dropzone');
+    if (dropzone) {
+      dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzone.style.borderColor = 'var(--gm-gold-primary)';
+        dropzone.style.background = 'rgba(246, 201, 69, 0.08)';
+      });
+      dropzone.addEventListener('dragleave', () => {
+        dropzone.style.borderColor = '';
+        dropzone.style.background = '';
+      });
+      dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.style.borderColor = '';
+        dropzone.style.background = '';
+        const file = e.dataTransfer?.files?.[0];
+        if (file) handleFileLoaded(file);
+      });
+    }
+
+    // Clear code button
+    clearBtn?.addEventListener('click', () => {
+      if (codeInput) codeInput.value = '';
+      currentXmlContent = '';
+      currentFileName = '';
+      if (fileInfo) {
+        fileInfo.textContent = '';
+        fileInfo.style.display = 'none';
+      }
+      if (fileInput) fileInput.value = '';
+    });
+
+    // Sample XML preset chips
+    const samplePresetUrls = {
+      advsharpen: { path: './assets/advsharpen.xml', name: 'Advanced Sharpen' },
+      gm_shake: { path: './assets/effects_gm3/gm_shake.xml', name: 'GM Camera Shake' },
+      gm_chromatic: { path: './assets/effects_gm3/gm_v53_pack_gm_chromatic_heat_warp.xml', name: 'Chromatic Heat Warp' },
+      liquid_glass: { path: './assets/effects_gm2/gm_pack_17_liquid_glass.xml', name: 'Liquid Glass Pro' }
+    };
+
+    presetChips?.querySelectorAll('[data-preset-xml]').forEach((chip) => {
+      chip.addEventListener('click', async () => {
+        const key = chip.dataset.presetXml;
+        const info = samplePresetUrls[key];
+        if (!info) return;
+
+        const originalText = chip.textContent;
+        try {
+          chip.textContent = '⏳ Loading…';
+          const resp = await fetch(info.path);
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const xmlText = await resp.text();
+          currentXmlContent = xmlText;
+          currentFileName = info.name;
+          if (codeInput) codeInput.value = xmlText;
+          if (fileInfo) {
+            fileInfo.textContent = `📄 Preset: ${info.name}`;
+            fileInfo.style.display = 'block';
+          }
+          // Switch to paste tab so user can review the XML
+          tabPaste?.click();
+        } catch (err) {
+          console.error('[Gold Motion] Failed to load preset XML:', err);
+          alert(`Failed to load preset XML: ${err.message}`);
+        } finally {
+          chip.textContent = originalText;
+        }
+      });
+    });
+
+    // Submit handler
+    submitBtn?.addEventListener('click', () => {
+      const xmlToParse = (codeInput?.value || currentXmlContent || '').trim();
+      if (!xmlToParse) {
+        alert('Please select an XML file or paste XML effect code first.');
+        return;
+      }
+
+      const shouldApply = applyCheck ? applyCheck.checked : true;
+      const shouldSave = saveCheck ? saveCheck.checked : true;
+      const defaultName = currentFileName ? currentFileName.replace(/\.xml$/i, '') : 'Custom XML Effect';
+
+      try {
+        const result = this.effectPipeline.parseAndRegisterXmlEffect(xmlToParse, defaultName, shouldSave);
+        let layer = this.scene?.getLayer(this.currentLayerId);
+
+        if (shouldApply) {
+          if (!layer && this.scene && this.scene.layers.length > 0) {
+            layer = this.scene.layers[0];
+            this.selectLayer(layer.id);
+          }
+
+          if (layer) {
+            layer.effects = layer.effects || [];
+            if (result.type === 'definition') {
+              layer.effects.push({
+                id: result.effect.id,
+                isCustomXml: true,
+                params: {}
+              });
+            } else if (result.type === 'preset' && Array.isArray(result.effects)) {
+              for (const eff of result.effects) {
+                eff.isCustomXml = true;
+                layer.effects.push(eff);
+              }
+            }
+            this.markUnexported();
+            this.renderEffectsStackList(layer);
+            this.render();
+          }
+        }
+
+        closeModal();
+
+        // Refresh effects catalog if open
+        const catalogModal = document.getElementById('gmEffectCatalogModal');
+        if (catalogModal && catalogModal.classList.contains('active')) {
+          this.openEffectCatalogModal(layer);
+        }
+
+        const effectName = result.effect?.name || (result.effects?.[0]?.id || 'Custom XML Effect');
+        if (this.mascot) {
+          this.mascot.say(`✨ Custom XML Effect "${effectName}" successfully loaded!`);
+        } else {
+          console.log(`[Gold Motion] Custom XML Effect loaded: "${effectName}"`);
+        }
+      } catch (err) {
+        console.error('[Gold Motion] Custom XML parsing error:', err);
+        alert(`Failed to parse custom XML effect:\n${err.message}`);
+      }
+    });
   }
 
   onCurveApplied(curveStr) {

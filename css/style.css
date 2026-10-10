@@ -1743,3 +1743,60 @@ body {
   font-size: 16px;
   margin-bottom: 4px;
 }
+
+/* Catalog Category Filter Pills */
+.gm-catalog-cat-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--gm-border-subtle);
+  background: #141622;
+  flex-shrink: 0;
+}
+.gm-cat-pill {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--gm-border-subtle);
+  color: var(--gm-text-muted);
+  padding: 4px 10px;
+  border-radius: 14px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+.gm-cat-pill:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+.gm-cat-pill.active {
+  background: var(--gm-gold-primary);
+  border-color: var(--gm-gold-primary);
+  color: #111216;
+  font-weight: 700;
+}
+.gm-cat-pill-gold {
+  border-color: rgba(246, 201, 69, 0.4);
+  color: var(--gm-gold-primary);
+}
+
+/* Custom XML Code Textarea */
+.gm-code-textarea {
+  width: 100%;
+  background: #10121d;
+  border: 1px solid var(--gm-border-subtle);
+  border-radius: 8px;
+  color: #a5f3fc;
+  font-family: 'Roboto Mono', Consolas, Monaco, monospace;
+  font-size: 12px;
+  padding: 10px 12px;
+  line-height: 1.5;
+  outline: none;
+  resize: vertical;
+}
+.gm-code-textarea:focus {
+  border-color: var(--gm-gold-primary);
+  box-shadow: 0 0 8px rgba(246, 201, 69, 0.2);
+}
