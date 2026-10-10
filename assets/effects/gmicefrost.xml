@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect id="com.gmfx.effects.icefrost" name="GM Ice Frost Frame" desc="Crystalline frost creeping in from the frame edges with icy shimmer and cold tint" category="stylize" tags="frost,ice,winter,frozen,crystal" overdraw="false" thumb="thumb/gm/gmicefrost.webp">
+<params>
+<texture id="inputImg" srcType="content"/>
+<section text="FROST"/>
+<spinner id="frostCreep" default="22.0" min="0.0" max="60.0" step="0.5" label="Creep Depth" type="percent"/>
+<spinner id="frostSoft" default="0.45" min="0.05" max="1.0" step="0.01" label="Edge Softness" type="percent"/>
+<spinner id="crystalRough" default="2.2" min="0.5" max="6.0" step="0.1" label="Crystal Roughness"/>
+<spinner id="frostSeed" default="0.0" min="0.0" max="100.0" step="1.0" label="Seed"/>
+<section text="ICE"/>
+<spinner id="frostBright" default="0.75" min="0.0" max="2.0" step="0.05" label="Frost Brightness"/>
+<spinner id="iceBlue" default="0.55" min="0.0" max="1.0" step="0.01" label="Cold Tint" type="percent"/>
+<spinner id="edgeShine" default="0.6" min="0.0" max="1.5" step="0.05" label="Frost Line Shine" type="percent"/>
+<color id="iceTint" default="#BFE2FF" label="Ice Color" alpha="false"/>
+</params>
+<shader type="fragment" precision="high"><![CDATA[float gmHash2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+float gmVnoise(vec2 p){
+vec2 i = floor(p); vec2 f = fract(p);
+f = f * f * (3.0 - 2.0 * f);
+return mix(mix(gmHash2(i), gmHash2(i + vec2(1.0, 0.0)), f.x),
+mix(gmHash2(i + vec2(0.0, 1.0)), gmHash2(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+void main(){
+vec2 uv = acLayerNorm;
+vec4 src = texture2DCv(inputImg.texture, acScreenNorm);
+if (frostCreep <= 0.0 || src.a <= 0.0) { gl_FragColor = src; return; }
+vec2 size = max(acLayerSize, vec2(1.0));
+vec2 aspect = size / min(size.x, size.y);
+vec2 e = min(uv, 1.0 - uv) * aspect;
+float edge = min(e.x, e.y) * 2.0;
+float cr = crystalRough;
+float n1 = gmVnoise(uv * aspect * cr * 14.0 + frostSeed);
+float n2 = gmVnoise(uv * aspect * cr * 30.0 + frostSeed * 2.7);
+float n3 = gmVnoise(uv * aspect * cr * 62.0 + frostSeed * 5.1);
+float crystal = n1 * 0.55 + n2 * 0.3 + n3 * 0.15;
+crystal = abs(crystal - 0.5) * 2.0;
+crystal = 1.0 - smoothstep(0.0, 0.55, crystal);
+float creep = frostCreep * 0.01 * 2.0;
+float soft = max(frostSoft, 0.03) * 0.35;
+float jag = (crystal - 0.5) * creep * 0.55;
+float frostM = 1.0 - smoothstep(creep - soft + jag, creep + soft + jag, edge);
+float lineD = abs(edge - (creep + jag));
+float shine = exp(-lineD * 60.0) * edgeShine;
+vec3 frostCol = iceTint.rgb * (0.55 + 0.65 * crystal) * frostBright;
+vec3 base = src.rgb / max(src.a, 1e-4);
+vec3 cold = base;
+float l = dot(cold, vec3(0.2126, 0.7152, 0.0722));
+cold = mix(cold, vec3(l), 0.45);
+cold = mix(cold, iceTint.rgb * (0.5 + l), iceBlue * 0.7);
+vec3 col = mix(base, mix(cold, frostCol, 0.55), frostM);
+col += iceTint.rgb * shine;
+gl_FragColor = vec4(clamp(col, 0.0, 1.0) * src.a, src.a);
+}]]></shader>
+</effect>

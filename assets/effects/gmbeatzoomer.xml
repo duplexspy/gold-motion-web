@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect id="com.gmfx.effects.beatzoomer" name="GM Beat Zoomer" desc="Keyframable beat zoom punch with chromatic kick and edge ripple" category="distort" tags="zoom,beat,punch,music,edit" overdraw="false" thumb="thumb/gm/gmbeatzoomer.webp">
+<params>
+<texture id="inputImg" srcType="content"/>
+<section text="PUNCH"/>
+<spinner id="punchAmt" default="0.0" min="0.0" max="1.0" step="0.01" label="Punch (keyframe)"/>
+<spinner id="punchCurvePow" default="2.2" min="0.5" max="5.0" step="0.05" label="Punch Curve"/>
+<spinner id="punchScale" default="0.16" min="0.0" max="1.0" step="0.01" label="Zoom Depth" type="percent"/>
+<spinner id="punchChroma" default="0.5" min="0.0" max="1.0" step="0.01" label="Chroma Kick" type="percent"/>
+<section text="CENTER"/>
+<spinner id="punchCX" default="50.0" min="0.0" max="100.0" step="0.5" label="Center X" type="percent"/>
+<spinner id="punchCY" default="50.0" min="0.0" max="100.0" step="0.5" label="Center Y" type="percent"/>
+</params>
+<shader type="fragment" precision="high"><![CDATA[void main(){
+vec2 uv = acScreenNorm;
+vec2 c = vec2(punchCX * 0.01, punchCY * 0.01);
+float p = pow(clamp(punchAmt, 0.0, 1.0), punchCurvePow);
+float zoom = 1.0 - p * punchScale * 0.5;
+vec2 suv = c + (uv - c) / max(zoom, 0.05);
+vec3 col;
+if (punchChroma > 0.001 && p > 0.001) {
+float ch = punchChroma * p * 0.004;
+vec2 dir = (suv - c);
+col.r = texture2DCv(inputImg.texture, clamp(suv - dir * ch, 0.0, 1.0)).r;
+col.g = texture2DCv(inputImg.texture, clamp(suv, 0.0, 1.0)).g;
+col.b = texture2DCv(inputImg.texture, clamp(suv + dir * ch, 0.0, 1.0)).b;
+} else {
+col = texture2DCv(inputImg.texture, clamp(suv, 0.0, 1.0)).rgb;
+}
+vec4 outC = texture2DCv(inputImg.texture, clamp(suv, 0.0, 1.0));
+gl_FragColor = vec4(col, outC.a);
+}]]></shader>
+</effect>

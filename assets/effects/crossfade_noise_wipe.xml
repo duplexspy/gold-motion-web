@@ -1,0 +1,37 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.crossfade_noise_wipe"
+name="Crossfade Noise Wipe"
+desc="Horizontal crossfade to color driven by a procedural noise mask."
+category="matte"
+tags="transition,wipe,noise,mask"
+thumb="thumb/SKEXNXX/shatter.gif"
+experimental="false">
+<params>
+<texture id="inputImg" srcType="content" label="Layer" />
+<section text="Mask" />
+<spinner id="progress" default="0.0" min="0.0" max="1.0" label="Progress" step="0.001" />
+<spinner id="crossfadeLength" default="1.0" min="0.0" max="2.0" label="Crossfade Length" step="0.01" />
+<spinner id="textureZoom" default="0.3" min="0.01" max="4.0" label="Noise Zoom" step="0.01" />
+<switch id="invert" default="false" label="Invert Direction" />
+<section text="Background" />
+<color id="bgColor" default="#000000" label="Background Color" />
+<spinner id="bgStrength" default="1.0" min="0.0" max="1.0" label="Background Strength" step="0.01" />
+<tip text="Animate Progress 0→1. Procedural noise; no extra textures needed. Blends to Background Color." />
+</params>
+<shader type="fragment" precision="high"><![CDATA[void main(){
+vec2 res = acScreenSize;
+vec2 fragCoord = acScreenNorm * res;
+vec2 uv = fragCoord / res;
+float pr = progress * (1.0 + crossfadeLength) - crossfadeLength;
+if (invert) {
+pr = 1.0 - (progress * (1.0 + crossfadeLength) - crossfadeLength);
+}
+float mask = smoothstep(uv.x - crossfadeLength, uv.x, pr);
+float n = fract(sin(dot(floor(uv * textureZoom * 1024.0), vec2(12.9898,78.233))) * 43758.5453);
+float m = clamp(n * mask + mask, 0.0, 1.0);
+vec3 a = texture2DCv(inputImg.texture, uv).rgb;
+vec3 b = bgColor.rgb;
+vec3 col = mix(a, b, m * bgStrength);
+gl_FragColor = vec4(col, 1.0);
+}]]></shader>
+</effect>

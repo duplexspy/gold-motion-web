@@ -1,0 +1,164 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.shatter_voronoi_mp"
+name="Shatter (Voronoi MP)"
+desc="After Effects‑style shatter using procedural Voronoi cells with edge glow"
+category="matte"
+tags="shatter,transition,voronoi,disintegrate,multipass"
+thumb="thumb/shatterv.webp"
+overdraw="true" max-overdraw="0.25">
+<strings>
+<locale lang="en">
+<string name="name">Shatter (Voronoi MP)</string>
+<string name="desc">Procedural Voronoi shatter with scatter, rotation, gravity and edge glow</string>
+<string name="section_shatter">Shatter</string>
+<string name="progress">Progress</string>
+<string name="cellscale">Cell Scale</string>
+<string name="randomness">Randomness</string>
+<string name="scatter">Scatter</string>
+<string name="rotation">Rotation</string>
+<string name="gravity">Gravity</string>
+<string name="edge">Edge</string>
+<string name="edge_width">Edge Width</string>
+<string name="edge_feather">Edge Feather</string>
+<string name="edge_glow">Edge Glow</string>
+<string name="edge_color">Edge Color</string>
+<string name="section_quality">Quality</string>
+<string name="quality">Quality</string>
+<string name="section_output">Output</string>
+<string name="glow_only">Glow Only</string>
+</locale>
+</strings>
+<params>
+<texture id="inputImg" srcType="content" />
+<texture id="shatterPass" srcType="buffer" />
+<texture id="edgeMask" srcType="buffer" downsample="2" />
+<texture id="hblur" srcType="buffer" downsample="2" />
+<texture id="vblur" srcType="buffer" downsample="2" />
+<section text="@string/section_shatter" />
+<spinner id="progress" default="0.0" min="0.0" max="1.0" step="0.005" label="@string/progress" type="percent" />
+<spinner id="cellScale" default="40.0" min="4.0" max="200.0" step="0.5" label="@string/cellscale" />
+<spinner id="randomness" default="0.5" min="0.0" max="1.0" step="0.01" label="@string/randomness" />
+<spinner id="scatter" default="0.2" min="0.0" max="1.0" step="0.01" label="@string/scatter" />
+<spinner id="rotAmount" default="90.0" min="-720.0" max="720.0" step="1.0" label="@string/rotation" />
+<spinner id="gravity" default="0.5" min="-2.0" max="2.0" step="0.01" label="@string/gravity" />
+<section text="@string/edge" />
+<spinner id="edgeWidth" default="0.8" min="0.1" max="4.0" step="0.05" label="@string/edge_width" />
+<spinner id="edgeFeather" default="0.5" min="0.0" max="2.0" step="0.01" label="@string/edge_feather" />
+<color id="edgeColor" default="#FFFFFFFF" label="@string/edge_color" alpha="true" />
+<spinner id="edgeGlow" default="0.6" min="0.0" max="3.0" step="0.01" label="@string/edge_glow" />
+<section text="@string/section_quality" />
+<selector id="quality" style="radio" default="2" label="@string/quality">
+<choice label="Low" value="1" />
+<choice label="Medium" value="2" />
+<choice label="High" value="3" />
+</selector>
+<section text="@string/section_output" />
+<switch id="glowOnly" default="false" label="@string/glow_only" />
+</params>
+<passes>
+<pass target="shatterPass" />
+<pass target="edgeMask" />
+<pass target="hblur" />
+<pass target="vblur" />
+<pass />
+</passes>
+<shader type="fragment" precision="high"><![CDATA[const float PI = 3.14159265358979323846;
+float hash11(float n){ return fract(sin(n)*43758.5453123); }
+float hash21(vec2 p){ return fract(1e4*sin(17.0*p.x + 0.1*p.y)*(0.1+abs(sin(13.0*p.y+7.0*p.x)))); }
+mat2 r2(float a){ float s=sin(a), c=cos(a); return mat2(c,-s,s,c); }
+vec4 voronoi(vec2 uv, float cellScale, float randAmt){
+vec2 g = uv * cellScale;
+vec2 i = floor(g);
+vec2 f = fract(g);
+float d1 = 1e9; vec2 id1 = vec2(0.0);
+float d2 = 1e9;
+for(int y=-1;y<=1;y++){
+for(int x=-1;x<=1;x++){
+vec2 o = vec2(x,y);
+vec2 h = i + o;
+float s = hash21(h);
+vec2 p = fract(vec2(s, hash11(s*91.7)) + randAmt*0.6);
+vec2 diff = (o + p) - f;
+float d = dot(diff,diff);
+if(d < d1){ d2 = d1; d1 = d; id1 = h + p; }
+else if(d < d2){ d2 = d; }
+}
+}
+return vec4(d1, d2, id1);
+}
+vec4 blurInternal(sampler2D tex, vec2 texOffset, vec2 st, float numBlurPixelsPerSide){
+float adjSigma = numBlurPixelsPerSide / 2.14596602;
+const float PIc = 3.14159265;
+highp vec3 incG;
+incG.x = 1.0 / (sqrt(2.0 * PIc) * max(adjSigma,1e-4));
+incG.y = exp(-0.5 / (max(adjSigma,1e-4) * max(adjSigma,1e-4)));
+incG.z = incG.y * incG.y;
+vec4 avg = texture2DCv(tex,st) * incG.x; float sum = incG.x;
+for(float i=1.0;i<=128.0;i+=2.0){
+float o0=i, o1=i+1.0;
+incG.xy *= incG.yz; float w0 = incG.x;
+incG.xy *= incG.yz; float w1 = incG.x;
+float w = w0 + w1;
+float off = (o0*w0 + o1*w1) / max(w,1e-6);
+vec2 o = texOffset * off;
+avg += texture2DCv(tex, st - o) * w;
+avg += texture2DCv(tex, st + o) * w;
+sum += 2.0*w;
+if(i>numBlurPixelsPerSide) break;
+}
+return avg / max(sum,1e-6);
+}
+void main(){
+int Q = int(quality);
+float taps = (Q==1)? 6.0 : (Q==2? 10.0 : 14.0);
+if(acPass==0){
+vec2 uv = acLayerNorm;
+uv.x *= acLayerSize.x/acLayerSize.y;
+vec4 v = voronoi(uv, cellScale, randomness);
+float d1 = sqrt(v.x);
+float d2 = sqrt(v.y);
+vec2 site = v.zw;
+vec2 siteUV = site / cellScale;
+float sid = hash21(floor(site));
+vec2 dir = normalize(vec2(cos(sid*6.2831), sin(sid*6.2831)) + 1e-3);
+float ang = radians(rotAmount) * progress * (sid*2.0-1.0);
+vec2 grav = vec2(0.0, gravity * progress * progress);
+vec2 T = dir * scatter * progress + grav;
+vec2 p = uv - siteUV;
+p = r2(-ang) * p;
+p -= T;
+vec2 sampleUV = p + siteUV;
+sampleUV.x /= acLayerSize.x/acLayerSize.y;
+vec4 src = texture2DCv(inputImg.texture, (vec4(sampleUV,0.,1.)*acLayerToScreen).xy);
+float e = clamp((d2 - d1) * cellScale * edgeWidth, 0.0, 1.0);
+float edgeMask = 1.0 - smoothstep(0.0, edgeFeather, e);
+gl_FragColor = vec4(src.rgb, edgeMask * src.a);
+return;
+}
+if(acPass==1){
+vec4 s = texture2DCv(shatterPass.texture, acScreenNorm);
+gl_FragColor = vec4(s.a);
+return;
+}
+if(acPass==2){
+float k = (Q==1? 6.0 : Q==2? 10.0 : 14.0);
+float kernelSize = k;
+vec2 texOffset = vec2(1.0/edgeMask.size.x, 0.0);
+gl_FragColor = blurInternal(edgeMask.texture, texOffset, acScreenNorm.st, kernelSize);
+return;
+}
+if(acPass==3){
+float k = (Q==1? 6.0 : Q==2? 10.0 : 14.0);
+float kernelSize = k;
+vec2 texOffset = vec2(0.0, 1.0/hblur.size.y);
+gl_FragColor = blurInternal(hblur.texture, texOffset, acScreenNorm.st, kernelSize);
+return;
+}
+vec4 shattered = texture2DCv(shatterPass.texture, acScreenNorm);
+vec3 baseRGB = shattered.rgb;
+float edgeB = texture2DCv(vblur.texture, acScreenNorm).r;
+vec3 glowRGB = edgeColor.rgb * edgeB * edgeGlow * edgeColor.a;
+vec3 outRGB = glowOnly ? glowRGB : (baseRGB + glowRGB);
+gl_FragColor = vec4(outRGB, shattered.a);
+}]]></shader>
+</effect>

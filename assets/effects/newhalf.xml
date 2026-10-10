@@ -1,0 +1,185 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.halftone_displace_edges"
+name="T_Halftone"
+desc="Halftone screen with two colors, optional displacement, and an 'Edges Halftone' mode (halftone only on edges). No uniform declarations."
+category="stylize"
+thumb="thumb/newhalf.webp"
+tags="halftone,displace,edges,screen,dot">
+<params>
+<texture id="inputImg" srcType="content" />
+<section text="Halftone" />
+<spinner id="dotSize" default="24.0" min="1.0" max="200.0" step="1.0" label="Dot Size (px)" />
+<spinner id="spacing" default="28.0" min="1.0" max="400.0" step="1.0" label="Dot Spacing (px)" />
+<spinner id="angle" default="0.0" min="0.0" max="360.0" step="0.1" label="Angle (deg)" />
+<spinner id="progress" default="0.0" min="0.0" max="1.0" step="0.001" label="Rotation Progress" />
+<spinner id="scale" default="1.0" min="0.1" max="5.0" step="0.01" label="Dot Scale" />
+<switch id="ellipse" default="false" label="Ellipse Dots" />
+<spinner id="ellipseX" default="1.0" min="0.1" max="4.0" step="0.01" label="Ellipse X Scale" />
+<spinner id="ellipseY" default="0.6" min="0.1" max="4.0" step="0.01" label="Ellipse Y Scale" />
+<section text="Colors" />
+<color id="primaryColor" default="#000000FF" label="Primary Color (drives displacement)" alpha="false" />
+<color id="secondaryColor" default="#FFFFFFFF" label="Secondary Color" alpha="false" />
+<switch id="colorMode" default="false" label="Use sampled color for dots (when off uses colours)" />
+<section text="Tone" />
+<spinner id="contrast" default="1.0" min="0.0" max="3.0" step="0.01" label="Contrast" />
+<spinner id="brightness" default="0.0" min="-1.0" max="1.0" step="0.01" label="Brightness" />
+<spinner id="edgeSoft" default="0.5" min="0.0" max="3.0" step="0.01" label="Edge Softness" />
+<section text="Displacement" />
+<switch id="useDisplacement" default="false" label="Enable Displacement" />
+<spinner id="dispAmount" default="18.0" min="-200.0" max="200.0" step="0.1" label="Displacement Strength (px)" />
+<spinner id="dispThreshold" default="0.25" min="0.0" max="1.0" step="0.01" label="Color Match Threshold" />
+<switch id="dispInvert" default="false" label="Invert Displacement (push vs pull)" />
+<spinner id="dispSoft" default="0.2" min="0.0" max="1.0" step="0.01" label="Displacement Softness" />
+<section text="Edges" />
+<switch id="edgesHalftone" default="false" label="Edges Halftone Only" />
+<spinner id="edgeThreshold" default="0.12" min="0.0" max="1.0" step="0.005" label="Edge Detection Threshold" />
+<spinner id="edgeBlur" default="2.0" min="0.0" max="8.0" step="0.1" label="Edge Mask Blur (softness)" />
+<spinner id="edgeStrength" default="1.0" min="0.0" max="3.0" step="0.01" label="Edge Mask Strength" />
+<section text="Output" />
+<switch id="overlay" default="true" label="Overlay on Source" />
+<spinner id="blend" default="1.0" min="0.0" max="1.0" step="0.01" label="Mix" />
+</params>
+<shader type="fragment" precision="high"><![CDATA[vec2 getResolution(){
+vec2 s = inputImg.size;
+if (s.x <= 0.0 || s.y <= 0.0) s = vec2(1920.0, 1080.0);
+return s;
+}
+vec2 rot(vec2 p, float a){
+float c = cos(a);
+float s = sin(a);
+return vec2(p.x * c - p.y * s, p.x * s + p.y * c);
+}
+float applyToneF(float v, float contrast, float brightness){
+v = (v - 0.5) * contrast + 0.5 + brightness;
+return clamp(v, 0.0, 1.0);
+}
+float colorDist(vec3 a, vec3 b){ return length(a - b); }
+float sobelEdge(vec2 uv, vec2 px){
+float tl = dot(texture2DCv(inputImg.texture, clamp(uv + vec2(-px.x, -px.y), vec2(0.0), vec2(1.0))).rgb, vec3(0.2126,0.7152,0.0722));
+float  l = dot(texture2DCv(inputImg.texture, clamp(uv + vec2(0.0, -px.y), vec2(0.0), vec2(1.0))).rgb, vec3(0.2126,0.7152,0.0722));
+float tr = dot(texture2DCv(inputImg.texture, clamp(uv + vec2(px.x, -px.y), vec2(0.0), vec2(1.0))).rgb, vec3(0.2126,0.7152,0.0722));
+float ml = dot(texture2DCv(inputImg.texture, clamp(uv + vec2(-px.x, 0.0), vec2(0.0), vec2(1.0))).rgb, vec3(0.2126,0.7152,0.0722));
+float mm = dot(texture2DCv(inputImg.texture, clamp(uv, vec2(0.0), vec2(1.0))).rgb, vec3(0.2126,0.7152,0.0722));
+float mr = dot(texture2DCv(inputImg.texture, clamp(uv + vec2(px.x, 0.0), vec2(0.0), vec2(1.0))).rgb, vec3(0.2126,0.7152,0.0722));
+float bl = dot(texture2DCv(inputImg.texture, clamp(uv + vec2(-px.x, px.y), vec2(0.0), vec2(1.0))).rgb, vec3(0.2126,0.7152,0.0722));
+float  b = dot(texture2DCv(inputImg.texture, clamp(uv + vec2(0.0, px.y), vec2(0.0), vec2(1.0))).rgb, vec3(0.2126,0.7152,0.0722));
+float br = dot(texture2DCv(inputImg.texture, clamp(uv + vec2(px.x, px.y), vec2(0.0), vec2(1.0))).rgb, vec3(0.2126,0.7152,0.0722));
+float gx = -tl - 2.0*ml - bl + tr + 2.0*mr + br;
+float gy = -tl - 2.0*l - tr + bl + 2.0*b + br;
+return length(vec2(gx, gy));
+}
+float blurMask(vec2 uv, vec2 px, float radius){
+float s = 0.0;
+float count = 0.0;
+int r = int(max(0.0, floor(radius)));
+for(int y = -r; y <= r; y++){
+for(int x = -r; x <= r; x++){
+vec2 off = vec2(float(x) * px.x, float(y) * px.y);
+s += sobelEdge(clamp(uv + off, vec2(0.0), vec2(1.0)), px);
+count += 1.0;
+}
+}
+return s / max(1.0, count);
+}
+void main(){
+vec2 res = getResolution();
+vec2 uv = acScreenNorm;
+vec2 frag = uv * res;
+vec2 center = 0.5 * res;
+vec2 px = vec2(1.0 / res.x, 1.0 / res.y);
+float dSize = max(1.0, dotSize);
+float dSpacing = max(1.0, spacing);
+float angDeg = angle;
+float rotAngle = radians(angDeg) + progress * 6.2831853;
+float s = scale;
+float edgeSoftness = max(0.001, edgeSoft);
+float cont = max(0.0, contrast);
+float bright = brightness;
+bool useSampleColor = colorMode;
+bool useEllipse = ellipse;
+float eX = max(0.001, ellipseX);
+float eY = max(0.001, ellipseY);
+float blendOut = clamp(blend, 0.0, 1.0);
+bool doDisp = useDisplacement;
+float dispAmountPx = dispAmount;
+float dispThresholdVal = clamp(dispThreshold, 0.0, 1.0);
+bool dispInv = dispInvert;
+float dispSoft = max(0.0, dispSoft);
+vec3 colPrimary = primaryColor.rgb;
+vec3 colSecondary = secondaryColor.rgb;
+bool onlyEdges = edgesHalftone;
+float eThresh = clamp(edgeThreshold, 0.0, 1.0);
+float eBlur = max(0.0, edgeBlur);
+float eStr = max(0.0, edgeStrength);
+vec2 local = frag - center;
+local = rot(local, rotAngle);
+vec2 rotPos = local + center;
+vec2 cell = floor(rotPos / dSpacing);
+vec2 cellCenterPx = (cell + 0.5) * dSpacing;
+vec2 sampleUV = clamp(cellCenterPx / res, vec2(0.0), vec2(1.0));
+vec3 sampleColor = texture2DCv(inputImg.texture, sampleUV).rgb;
+float lum = dot(sampleColor, vec3(0.2126, 0.7152, 0.0722));
+lum = applyToneF(lum, cont, bright);
+float inv = 1.0 - lum;
+float baseRadius = clamp((dSize * s) * 0.5 / dSpacing, 0.0, 0.5);
+float radius = baseRadius * inv;
+float dx = (rotPos.x - cellCenterPx.x);
+float dy = (rotPos.y - cellCenterPx.y);
+if (useEllipse){
+dx /= eX;
+dy /= eY;
+}
+float dist = length(vec2(dx, dy));
+float pxRadius = radius * dSpacing;
+float edge = max(1.0, dSpacing * 0.01) * edgeSoftness;
+float alphaDot = 1.0 - smoothstep(pxRadius - edge, pxRadius + edge, dist);
+float primaryMatch = 1.0 - smoothstep(dispThresholdVal, dispThresholdVal + 0.2, colorDist(sampleColor, colPrimary));
+vec3 dotCol;
+if (useSampleColor){
+dotCol = sampleColor;
+} else {
+dotCol = mix(colSecondary, colPrimary, primaryMatch);
+}
+float match = 1.0 - smoothstep(dispThresholdVal, dispThresholdVal + 0.25, colorDist(sampleColor, colPrimary));
+match = pow(match, 1.0 + dispSoft * 2.0);
+vec2 dir = normalize(vec2(rotPos.x - cellCenterPx.x, rotPos.y - cellCenterPx.y) + vec2(1e-6, 0.0));
+if (length(vec2(rotPos.x - cellCenterPx.x, rotPos.y - cellCenterPx.y)) < 0.5){
+dir = vec2(0.0, -1.0);
+}
+float sign = dispInv ? -1.0 : 1.0;
+vec2 dispUVoffset = sign * dir * (match * dispAmountPx) / res.y;
+vec2 displacedUV = clamp(uv + dispUVoffset, vec2(0.0), vec2(1.0));
+vec3 displacedBackground = texture2DCv(inputImg.texture, displacedUV).rgb;
+vec3 finalDotCol;
+if (useSampleColor){
+finalDotCol = sampleColor * (0.3 + 0.7 * (1.0 - lum));
+} else {
+finalDotCol = dotCol;
+}
+vec3 halftone = finalDotCol * alphaDot;
+float e = sobelEdge(uv, px);
+if (eBlur > 0.5){
+float b = blurMask(uv, px, eBlur);
+e = mix(e, b, 0.6);
+}
+float eMask = smoothstep(eThresh, eThresh + 0.25 * max(0.001, eBlur), e) * eStr;
+eMask = clamp(eMask, 0.0, 1.0);
+vec3 baseBg = doDisp ? displacedBackground : texture2DCv(inputImg.texture, uv).rgb;
+float finalDotMix = alphaDot * blendOut;
+if (onlyEdges){
+finalDotMix *= eMask;
+}
+vec3 outCol;
+if (overlay){
+outCol = mix(baseBg, halftone, finalDotMix);
+} else {
+vec3 original = texture2DCv(inputImg.texture, uv).rgb;
+if (onlyEdges){
+outCol = mix(original, mix(baseBg, halftone, finalDotMix), blendOut);
+} else {
+outCol = mix(original, halftone, blendOut);
+}
+}
+gl_FragColor = vec4(outCol, 1.0);
+}]]></shader>
+</effect>

@@ -1,0 +1,123 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.s_pixelsort_v4"
+name="s_pixelsort"
+desc="True pixel sorting. Every pixel above (or below) the threshold starts a run that marches along the sort angle and stops the moment the run ends; the pixel then takes the extreme value found inside its own run, so bright or dark pixels smear into streaks that follow the layer instead of the screen."
+category="glitch"
+tags="glitch,pixelsort,sort,digital,ae,sapphire"
+thumb="thumb/pixelsort.webp"
+experimental="false">
+<params>
+<texture id="inputImg" srcType="content" />
+<section text="Threshold" />
+<slider id="threshold" default="0.32" min="0.0" max="1.0" label="Threshold" type="percent" />
+<slider id="softenThreshold" default="0.10" min="0.0" max="1.0" label="Soften Threshold" type="percent" />
+<selector id="sortType" style="dropdown" default="0" label="Sort By">
+<choice value="0" label="Luma" />
+<choice value="1" label="Red Channel" />
+<choice value="2" label="Green Channel" />
+<choice value="3" label="Blue Channel" />
+</selector>
+<selector id="sortDirection" style="dropdown" default="0" label="Sort Direction">
+<choice value="0" label="Sort Above Threshold" />
+<choice value="1" label="Sort Below Threshold" />
+</selector>
+<section text="Streak" />
+<spinner id="sortAngle" default="0.0" min="-180.0" max="180.0" step="1.0" label="Sort Angle" type="angle" />
+<slider id="streak" default="0.45" min="0.0" max="1.0" label="Streak Length" type="percent" />
+<selector id="sortMode" style="dropdown" default="0" label="Sort Mode">
+<choice value="0" label="Extreme" />
+<choice value="1" label="Run Average" />
+</selector>
+<section text="Quality" />
+<spinner id="steps" default="40" min="8" max="64" step="1" label="Sample Steps" type="integer" />
+<slider id="randomlyRestart" default="0.0" min="0.0" max="1.0" label="Randomly Restart" type="percent" />
+<spinner id="seed" default="0.0" min="0.0" max="100.0" step="1.0" label="Seed" />
+<section text="Output" />
+<slider id="mixWithSource" default="0.0" min="0.0" max="1.0" label="Mix With Source" type="percent" />
+<slider id="opacity" default="1.0" min="0.0" max="1.0" label="Output Opacity" type="percent" />
+</params>
+<shader type="fragment" precision="high"><![CDATA[const int MAXSTEPS = 64;
+const float PI = 3.14159265359;
+
+float getVal(vec3 col, int type){
+if (type == 1) return col.r;
+if (type == 2) return col.g;
+if (type == 3) return col.b;
+return dot(col, vec3(0.2126, 0.7152, 0.0722));
+}
+float hash21(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+
+float gAsp = 1.0;   // layer aspect - set once in main()
+
+// LAYER -> SCREEN. The run marches in layer space so the streaks rotate and
+// scale with the layer; every read of the source has to come back through here.
+vec2 lpToScreen(vec2 v){ return (vec4(v, 0.0, 1.0) * acLayerToScreen).xy; }
+vec4 fetchA(vec2 a){ return texture2DCv(inputImg.texture, clamp(lpToScreen(vec2(a.x / gAsp, a.y)), 0.0, 1.0)); }
+
+void main(){
+vec4 src = texture2DCv(inputImg.texture, acScreenNorm);
+vec2 lp  = acLayerNorm;
+
+// Aspect-corrected layer space: isotropic, so the sort angle means the same
+// thing visually whatever shape the layer is.
+gAsp = acLayerSize.x / max(acLayerSize.y, 1.0);
+vec2 lpA = vec2(lp.x * gAsp, lp.y);
+
+float rad = sortAngle * (PI / 180.0);
+vec2 dirA = vec2(cos(rad), sin(rad));
+
+int   ty   = int(sortType);
+float soft = max(softenThreshold, 0.001);
+float tLow  = threshold - soft * 0.5;
+float tHigh = threshold + soft * 0.5;
+
+float val  = getVal(src.rgb, ty);
+float inRun = ((abs(sortDirection - 0.0) < 0.5))
+? smoothstep(tLow, tHigh, val)
+: 1.0 - smoothstep(tLow, tHigh, val);
+
+vec3 res = src.rgb;
+if (inRun > 0.01){
+// Per-pixel run length: with Randomly Restart the streaks break into
+// segments instead of running off the edge of the layer.
+float rnd = hash21(vec2(seed, seed * 0.5) + floor(lpA * 24.0) * 0.017);
+float runLen = streak * mix(1.0, 0.25 + 0.75 * rnd, randomlyRestart);
+float stepLen = max(runLen, 1e-4) / float(max(steps, 1.0));
+
+int stepsI = int(clamp(steps, 8.0, 64.0));
+float bestVal = ((abs(sortDirection - 0.0) < 0.5)) ? -1.0 : 2.0;
+vec3  bestCol = src.rgb;
+vec3  acc = src.rgb;
+float wsum = 1.0;
+float count = 1.0;
+
+for (int i = 1; i < MAXSTEPS; i++){
+if (i >= stepsI) break;
+float d = float(i) * stepLen;
+vec2 sA = lpA - dirA * d;
+// outside the layer -> the run ended
+if (sA.x < 0.0 || sA.x > gAsp || sA.y < 0.0 || sA.y > 1.0) break;
+vec4 sc = fetchA(sA);
+float sv = getVal(sc.rgb, ty);
+float sm = ((abs(sortDirection - 0.0) < 0.5))
+? smoothstep(tLow, tHigh, sv)
+: 1.0 - smoothstep(tLow, tHigh, sv);
+// the pixel that fails the threshold test ends the run - this is what
+// makes it a SORT and not a directional blur
+if (sm < 0.5) break;
+if ((abs(sortDirection - 0.0) < 0.5)){ if (sv > bestVal){ bestVal = sv; bestCol = sc.rgb; } }
+else                   { if (sv < bestVal){ bestVal = sv; bestCol = sc.rgb; } }
+acc += sc.rgb;
+wsum += 1.0;
+count += 1.0;
+}
+
+vec3 runCol = ((abs(sortMode - 0.0) < 0.5)) ? bestCol : (acc / max(count, 1.0));
+res = runCol;
+}
+
+res = clamp(res, 0.0, 1.0);
+res = mix(res, src.rgb, mixWithSource);
+gl_FragColor = vec4(res, src.a * opacity);
+}]]></shader>
+</effect>

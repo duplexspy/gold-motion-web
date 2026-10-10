@@ -1,0 +1,57 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect
+id="com.alightcreative.effects.colorgrid"
+name="Color Grid"
+desc="Amazing New Extra FX from the Modder"
+category="other"
+tags="other"
+thumb="thumb/SKEXNXX/lineg.webp"
+experimental="false">
+<params>
+<texture id="inputImg" srcType="content" />
+<tip text="The export results will be slightly enlarged from the preview, reduce the value scale to get the desired value" />
+<spinner id="progressa" label="Evolution" default="10.0" min="0" max="100.0" step="0.05" type="percent" />
+<spinner id="progressb" label="Hue" default="2.5" min="0" max="100.0" step="0.01" type="percent" />
+<spinner id="scale" default="10.0" min="0.0" max="20.0" step="0.05" label="Scale" type="percent" />
+<spinner id="bright" default="1.0" min="1.0" max="3.0" step="0.01" label="Brightness" type="percent" />
+<spinner id="alpha" default="1.0" min="0.0" max="1.0" step="0.01" label="Alpha" type="percent" />
+<selector id="blendMode" style="radio" default="0" label="@am:string/effect_param_blendmode">
+<choice label="NORMAL" value="0" />
+<choice label="MULTIPLY" value="1" />
+<choice label="SCREEN" value="2" />
+</selector>
+</params>
+<shader type="fragment" precision="high"><![CDATA[mat2 rot2m(float a){
+float s = sin(a);
+float c = cos(a);
+return mat2(c, -s, s, c);
+}
+vec2 l2s( vec2 v ) {
+return (vec4(v,0.,1.)*acLayerToScreen).xy;
+}
+#define FragCoord gl_FragCoord
+void main ()
+{
+vec4 texColor = texture2DCv(inputImg.texture,acScreenNorm);
+vec4 texColorX = vec4(0.0,0.0,0.0,1.0) * texColor.a;
+vec4 result;
+vec2  px = 4.0*(-acScreenNorm + scale*FragCoord.xy) / acScreenSize.y;
+float id = 0.5 + 0.5*cos(progressa + sin(dot(floor(px+0.5),vec2(113.1,17.81)))*43758.545);
+vec3  co = 0.5 + 0.5*cos(progressb + 2.0*id + vec3(0.0,1.0,2.0) );
+vec2  pa = smoothstep( 0.0, 0.2, id*(0.5 + 0.5*cos(6.2831*px)) );
+result = vec4( co*pa.x*pa.y, 1.0 );
+vec4 factor = mix(texColorX,result,alpha);
+vec4 resultfinal;
+if( blendMode==0 ) {
+resultfinal = (factor * bright) * texColor.a;
+} else if( blendMode==1 ) {
+factor *= bright;
+vec4 c = factor + vec4(1.)*(1.-factor.a);
+resultfinal = vec4((texColor.rgb/texColor.a)*c.rgb,1.0) * texColor.a;
+} else if( blendMode==2 ) {
+factor *= bright;
+resultfinal = vec4( 1.-((1.-(texColor.rgb/texColor.a))*(1.-factor.rgb)),1.0) * texColor.a;
+}
+gl_FragColor = resultfinal;
+}]]></shader>
+</effect>

@@ -1,0 +1,36 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<effect id="com.example.learning.cclens"
+name="CC Lens"
+desc="Creates a fish-eye lens or orb distortion effect."
+category="distort"
+thumb="thumb/cclens.webp"
+tags="learning,distort,lens,orb">
+<params>
+<texture id="inputImg" srcType="content" />
+<spinner id="size" default="50.0" min="10.0" max="200.0" step="1.0" label="Size" />
+<spinner id="convergence" default="1.0" min="-2.0" max="2.0" step="0.1" label="Convergence" />
+</params>
+<shader type="fragment" precision="high"><![CDATA[const float PI = 3.14159265359;
+void main() {
+vec2 uv = acScreenNorm - 0.5;
+float aspect = acScreenSize.x / acScreenSize.y;
+uv.x *= aspect;
+float dist = length(uv);
+float angle = atan(uv.y, uv.x);
+float radius = size / 100.0;
+if (dist > radius) {
+gl_FragColor = vec4(0.0);
+return;
+}
+float normalizedDist = dist / radius;
+float z = sqrt(1.0 - normalizedDist * normalizedDist);
+float r = atan(normalizedDist, z * convergence) / PI;
+r *= 2.0;
+vec2 newUV;
+newUV.x = r * cos(angle);
+newUV.y = r * sin(angle);
+newUV.x /= aspect;
+newUV += 0.5;
+gl_FragColor = texture2DCv(inputImg.texture, newUV);
+}]]></shader>
+</effect>

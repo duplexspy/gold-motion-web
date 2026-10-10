@@ -1,0 +1,73 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.paint_brush_stylizer" name="Auto Paint" desc="Simulates a painterly effect using oriented strokes based on image gradients." category="drawing" tags="art,painter,brush,stylize" thumb="thumb/SKEXNXX/brush.webp">
+<params>
+<spinner id="frequency" default="25.30" min="10.0" max="100.0" step="0.1" label="Frequency (Density)" />
+<spinner id="strokeLength" default="1.92" min="0.1" max="2.5" step="0.01" label="Stroke Length" />
+<spinner id="jitter" default="0.00" min="0.0" max="1.0" step="0.01" label="Animated Jitter" />
+<spinner id="strokeWidth" default="0.62" min="0.1" max="1.0" step="0.01" label="Stroke Width" />
+<texture id="inputImg" srcType="content" />
+</params>
+<shader type="fragment" precision="high"><![CDATA[float hash12(vec2 p) {
+vec3 p3  = fract(vec3(p.xyx) * .1031);
+p3 += dot(p3, p3.yzx + 33.33);
+return fract((p3.x + p3.y) * p3.z);
+}
+vec3 getSource(vec2 uv) {
+return texture2DCv(inputImg.texture, uv).rgb;
+}
+float getGray(vec3 c) {
+return dot(c, vec3(0.299, 0.587, 0.114));
+}
+void main() {
+vec2 uv = acScreenNorm;
+float aspect = acScreenSize.x / acScreenSize.y;
+vec2 scale = vec2(frequency * aspect, frequency);
+vec2 gridUV = uv * scale;
+vec2 gridId = floor(gridUV);
+vec3 pixelColor = getSource(uv);
+float bestPriority = -1.0;
+for (float y = -2.0; y <= 2.0; y++) {
+for (float x = -2.0; x <= 2.0; x++) {
+vec2 neighbor = vec2(x, y);
+vec2 id = gridId + neighbor;
+float timeOffset = (jitter > 0.5) ? floor(acTime * 12.0) : 0.0;
+vec2 seed = id + vec2(timeOffset * 0.1, timeOffset * 1.618);
+vec2 rand = vec2(hash12(seed), hash12(seed + 4.13));
+vec2 centerGrid = neighbor + rand;
+vec2 centerUV = (id + rand) / scale;
+if (centerUV.x < 0.0 || centerUV.x > 1.0 || centerUV.y < 0.0 || centerUV.y > 1.0) continue;
+vec3 col = getSource(centerUV);
+vec2 eps = vec2(2.0 / acScreenSize.x, 2.0 / acScreenSize.y);
+float gC = getGray(col);
+float gH = getGray(getSource(centerUV + vec2(eps.x, 0.0)));
+float gV = getGray(getSource(centerUV + vec2(0.0, eps.y)));
+float dX = gH - gC;
+float dY = gV - gC;
+float angle = atan(dY, dX) + 1.5708;
+vec2 p = fract(gridUV);
+vec2 delta = p - centerGrid;
+float cs = cos(-angle);
+float sn = sin(-angle);
+vec2 rotP = vec2(delta.x * cs - delta.y * sn, delta.x * sn + delta.y * cs);
+float len = strokeLength * 0.8;
+float wid = strokeWidth * 0.3;
+float dx = max(abs(rotP.x) - len, 0.0);
+float dy = abs(rotP.y);
+float dist = length(vec2(dx, dy));
+float mask = 1.0 - smoothstep(wid - 0.1, wid + 0.1, dist);
+float brushNoise = hash12(rotP * 10.0 + seed);
+mask *= 0.8 + 0.2 * brushNoise;
+if (mask > 0.01) {
+float depth = rand.x;
+float priority = depth * mask;
+if (priority > bestPriority) {
+bestPriority = priority;
+pixelColor = col;
+pixelColor *= 0.95 + 0.05 * mask;
+}
+}
+}
+}
+gl_FragColor = vec4(pixelColor, 1.0);
+}]]></shader>
+</effect>

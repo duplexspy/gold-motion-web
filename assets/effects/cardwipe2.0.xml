@@ -1,0 +1,257 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect
+id="com.alightcreative.effects.card_wipe_es2"
+name="Card Wipe (ES2)"
+desc="Transition effect that splits the layer into a grid of cards that flip to reveal a back layer. Cards flip sequentially based on flip order with timing controls. At default 0% completion the image is perfectly flat and untouched. Port of AE Card Wipe."
+category="transition"
+tags="card,wipe,flip,transition,3d,tiles,reveal"
+thumb="thumb/gm/card-wipe.webp"
+experimental="false">
+<params>
+<texture id="inputImg" srcType="content"/>
+<section text="Card Wipe"/>
+<slider id="transCompletion" default="0.0" min="0.0" max="100.0" label="Transition Completion" type="percent"/>
+<slider id="transWidth" default="50.0" min="0.0" max="100.0" label="Transition Width" type="percent"/>
+<selector id="rowColMode" style="dropdown" default="0" label="Rows &amp; Columns">
+<choice value="0" label="Independent"/>
+<choice value="1" label="Columns Follows Rows"/>
+</selector>
+<slider id="rows" default="9.0" min="1.0" max="100.0" label="Rows"/>
+<slider id="columns" default="12.0" min="1.0" max="100.0" label="Columns"/>
+<slider id="cardScale" default="1.0" min="0.1" max="2.0" label="Card Scale"/>
+<selector id="flipAxis" style="dropdown" default="0" label="Flip Axis">
+<choice value="0" label="X"/>
+<choice value="1" label="Y"/>
+</selector>
+<selector id="flipDirection" style="dropdown" default="0" label="Flip Direction">
+<choice value="0" label="Positive"/>
+<choice value="1" label="Negative"/>
+</selector>
+<selector id="flipOrder" style="dropdown" default="0" label="Flip Order">
+<choice value="0" label="Left to Right"/>
+<choice value="1" label="Right to Left"/>
+<choice value="2" label="Top to Bottom"/>
+<choice value="3" label="Bottom to Top"/>
+<choice value="4" label="Center Out"/>
+<choice value="5" label="Edges In"/>
+<choice value="6" label="Random"/>
+</selector>
+<slider id="timingRandom" default="0.0" min="0.0" max="100.0" label="Timing Randomness" type="percent"/>
+<slider id="randomSeed" default="1.0" min="0.0" max="9999.0" label="Random Seed"/>
+<section text="Back"/>
+<selector id="backMode" style="dropdown" default="0" label="Back Face">
+<choice value="0" label="Source (Mirrored)"/>
+<choice value="1" label="Solid Color"/>
+<choice value="2" label="Transparent"/>
+</selector>
+<color id="backColor" default="#000000" label="Back Color"/>
+<section text="Camera"/>
+<slider id="camDist" default="3.0" min="1.0" max="20.0" label="Camera Distance"/>
+<slider id="camTilt" default="0.0" min="-45.0" max="45.0" label="Camera Tilt"/>
+<slider id="camPan" default="0.0" min="-45.0" max="45.0" label="Camera Pan"/>
+<slider id="fov" default="60.0" min="20.0" max="120.0" label="Field of View"/>
+<section text="Lighting"/>
+<switch id="lightEnabled" default="true" label="Enable Lighting"/>
+<slider id="ambient" default="40.0" min="0.0" max="100.0" label="Ambient" type="percent"/>
+<slider id="diffuse" default="60.0" min="0.0" max="100.0" label="Diffuse" type="percent"/>
+<slider id="specular" default="20.0" min="0.0" max="100.0" label="Specular" type="percent"/>
+<section text="Position Jitter"/>
+<slider id="jitterX" default="0.0" min="0.0" max="200.0" label="X Amount"/>
+<slider id="jitterY" default="0.0" min="0.0" max="200.0" label="Y Amount"/>
+<slider id="jitterZ" default="0.0" min="0.0" max="200.0" label="Z Amount"/>
+<section text="Rotation Jitter"/>
+<slider id="rotJitterX" default="0.0" min="0.0" max="90.0" label="X Amount"/>
+<slider id="rotJitterY" default="0.0" min="0.0" max="90.0" label="Y Amount"/>
+<slider id="rotJitterZ" default="0.0" min="0.0" max="90.0" label="Z Amount"/>
+<section text="created by k1llez.tt"/>
+</params>
+<shader type="fragment" precision="high"><![CDATA[precision highp float;
+precision highp int;
+const float PI = 3.14159265359;
+float hash12(vec2 p) {
+vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+p3 += dot(p3, p3.yzx + 33.33);
+return fract((p3.x + p3.y) * p3.z);
+}
+mat3 rotX(float a) { float s = sin(a), c = cos(a); return mat3(1.0,0.0,0.0, 0.0,c,-s, 0.0,s,c); }
+mat3 rotY(float a) { float s = sin(a), c = cos(a); return mat3(c,0.0,s, 0.0,1.0,0.0, -s,0.0,c); }
+mat3 rotZ(float a) { float s = sin(a), c = cos(a); return mat3(c,-s,0.0, s,c,0.0, 0.0,0.0,1.0); }
+mat3 transposeM(mat3 m) {
+return mat3(
+m[0][0], m[1][0], m[2][0],
+m[0][1], m[1][1], m[2][1],
+m[0][2], m[1][2], m[2][2]
+);
+}
+float easeInOut(float t) { t = clamp(t, 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+void main() {
+vec2 res = acScreenSize;
+vec2 fragPos = acScreenNorm * res;
+vec2 uv = acScreenNorm;
+vec2 screenCenter = res * 0.5;
+float aspect = res.x / res.y;
+float numRows = max(rows, 1.0);
+float numCols;
+if (rowColMode == 1) numCols = numRows * aspect;
+else numCols = max(columns, 1.0);
+float completion = transCompletion * 0.01;
+float width = max(transWidth * 0.01, 0.001);
+float focalLen = 1.0 / tan(radians(fov) * 0.5);
+mat3 camRot = rotX(radians(camTilt)) * rotY(radians(camPan));
+mat3 camRotInv = transposeM(camRot);
+float fit = camDist / focalLen;
+if (completion < 0.001 &&
+jitterX < 0.001 && jitterY < 0.001 && jitterZ < 0.001 &&
+rotJitterX < 0.001 && rotJitterY < 0.001 && rotJitterZ < 0.001 &&
+abs(camTilt) < 0.01 && abs(camPan) < 0.01) {
+gl_FragColor = texture2DCv(inputImg.texture, uv);
+return;
+}
+vec4 result = vec4(0.0);
+float bestDepth = 9999.0;
+bool hitAny = false;
+int estCol = int(floor(uv.x * numCols));
+int estRow = int(floor(uv.y * numRows));
+int searchR = 2;
+if (completion > 0.01) searchR = 3;
+for (int dy = -3; dy <= 3; dy++) {
+if (dy < -searchR || dy > searchR) continue;
+for (int dx = -3; dx <= 3; dx++) {
+if (dx < -searchR || dx > searchR) continue;
+int col = estCol + dx;
+int row = estRow + dy;
+if (col < 0 || col >= int(numCols)) continue;
+if (row < 0 || row >= int(numRows)) continue;
+float fCol = float(col);
+float fRow = float(row);
+float orderVal = 0.0;
+float normCol = fCol / max(numCols - 1.0, 1.0);
+float normRow = fRow / max(numRows - 1.0, 1.0);
+if (flipOrder == 0) orderVal = normCol;
+else if (flipOrder == 1) orderVal = 1.0 - normCol;
+else if (flipOrder == 2) orderVal = normRow;
+else if (flipOrder == 3) orderVal = 1.0 - normRow;
+else if (flipOrder == 4) {
+float cx = abs(normCol - 0.5) * 2.0;
+float cy = abs(normRow - 0.5) * 2.0;
+orderVal = max(cx, cy);
+} else if (flipOrder == 5) {
+float cx = abs(normCol - 0.5) * 2.0;
+float cy = abs(normRow - 0.5) * 2.0;
+orderVal = 1.0 - max(cx, cy);
+} else {
+orderVal = hash12(vec2(fCol, fRow) + randomSeed * 7.31);
+}
+if (timingRandom > 0.0) {
+float rnd = hash12(vec2(fCol + 100.0, fRow + 200.0) + randomSeed * 3.7);
+orderVal = mix(orderVal, rnd, timingRandom * 0.01);
+}
+float cardStart = orderVal * (1.0 - width);
+float cardProgress = clamp((completion - cardStart) / width, 0.0, 1.0);
+cardProgress = easeInOut(cardProgress);
+float flipAngle = cardProgress * PI;
+if (flipDirection == 1) flipAngle = -flipAngle;
+vec2 cardCenterScreen = vec2((fCol + 0.5) / numCols, (fRow + 0.5) / numRows);
+vec2 cardWorldXY = vec2(
+(cardCenterScreen.x - 0.5) * 2.0 * aspect,
+-(cardCenterScreen.y - 0.5) * 2.0
+) * fit;
+float halfW = (1.0 / numCols) * aspect * cardScale * fit;
+float halfH = (1.0 / numRows) * cardScale * fit;
+float jitMix = cardProgress * (1.0 - cardProgress) * 4.0;
+vec3 posJit = vec3(0.0);
+if (jitterX > 0.0 || jitterY > 0.0 || jitterZ > 0.0) {
+float jrx = (hash12(vec2(fCol + 10.0, fRow + 20.0) + randomSeed) - 0.5) * 2.0;
+float jry = (hash12(vec2(fCol + 30.0, fRow + 40.0) + randomSeed) - 0.5) * 2.0;
+float jrz = (hash12(vec2(fCol + 50.0, fRow + 60.0) + randomSeed) - 0.5) * 2.0;
+posJit = vec3(jrx * jitterX * 0.005 * fit, jry * jitterY * 0.005 * fit, jrz * jitterZ * 0.005) * jitMix;
+}
+vec3 rotJit = vec3(0.0);
+if (rotJitterX > 0.0 || rotJitterY > 0.0 || rotJitterZ > 0.0) {
+float jrx = (hash12(vec2(fCol + 70.0, fRow + 80.0) + randomSeed) - 0.5) * 2.0;
+float jry = (hash12(vec2(fCol + 90.0, fRow + 100.0) + randomSeed) - 0.5) * 2.0;
+float jrz = (hash12(vec2(fCol + 110.0, fRow + 120.0) + randomSeed) - 0.5) * 2.0;
+rotJit = vec3(radians(jrx * rotJitterX), radians(jry * rotJitterY), radians(jrz * rotJitterZ)) * jitMix;
+}
+mat3 cardRot;
+if (flipAxis == 0) cardRot = rotX(flipAngle + rotJit.x) * rotY(rotJit.y) * rotZ(rotJit.z);
+else               cardRot = rotY(flipAngle + rotJit.y) * rotX(rotJit.x) * rotZ(rotJit.z);
+vec3 cardCenter3D = vec3(cardWorldXY, 0.0) + posJit;
+vec3 c0 = cardCenter3D + cardRot * vec3(-halfW,  halfH, 0.0);
+vec3 c1 = cardCenter3D + cardRot * vec3( halfW,  halfH, 0.0);
+vec3 c2 = cardCenter3D + cardRot * vec3( halfW, -halfH, 0.0);
+vec3 c3 = cardCenter3D + cardRot * vec3(-halfW, -halfH, 0.0);
+vec3 v0 = camRotInv * c0 + vec3(0.0, 0.0, camDist);
+vec3 v1 = camRotInv * c1 + vec3(0.0, 0.0, camDist);
+vec3 v2 = camRotInv * c2 + vec3(0.0, 0.0, camDist);
+vec3 v3 = camRotInv * c3 + vec3(0.0, 0.0, camDist);
+if (v0.z < 0.01 && v1.z < 0.01 && v2.z < 0.01 && v3.z < 0.01) continue;
+v0.z = max(v0.z, 0.01); v1.z = max(v1.z, 0.01);
+v2.z = max(v2.z, 0.01); v3.z = max(v3.z, 0.01);
+float s0 = screenCenter.y * focalLen / v0.z;
+float s1 = screenCenter.y * focalLen / v1.z;
+float s2 = screenCenter.y * focalLen / v2.z;
+float s3 = screenCenter.y * focalLen / v3.z;
+vec2 p0 = screenCenter + vec2(v0.x, -v0.y) * s0;
+vec2 p1 = screenCenter + vec2(v1.x, -v1.y) * s1;
+vec2 p2 = screenCenter + vec2(v2.x, -v2.y) * s2;
+vec2 p3 = screenCenter + vec2(v3.x, -v3.y) * s3;
+float cross0 = (p1.x-p0.x)*(fragPos.y-p0.y) - (p1.y-p0.y)*(fragPos.x-p0.x);
+float cross1 = (p2.x-p1.x)*(fragPos.y-p1.y) - (p2.y-p1.y)*(fragPos.x-p1.x);
+float cross2 = (p3.x-p2.x)*(fragPos.y-p2.y) - (p3.y-p2.y)*(fragPos.x-p2.x);
+float cross3 = (p0.x-p3.x)*(fragPos.y-p3.y) - (p0.y-p3.y)*(fragPos.x-p3.x);
+bool cw  = (cross0 >= 0.0 && cross1 >= 0.0 && cross2 >= 0.0 && cross3 >= 0.0);
+bool ccw = (cross0 <= 0.0 && cross1 <= 0.0 && cross2 <= 0.0 && cross3 <= 0.0);
+if (!(cw || ccw)) continue;
+float avgZ = (v0.z + v1.z + v2.z + v3.z) * 0.25;
+if (avgZ >= bestDepth) continue;
+vec3 normal = cardRot * vec3(0.0, 0.0, 1.0);
+vec3 viewDir = vec3(0.0, 0.0, -1.0);
+bool isFrontFace = dot(normal, viewDir) < 0.0;
+float distToTop = abs((p1.x-p0.x)*(p0.y-fragPos.y) - (p0.x-fragPos.x)*(p1.y-p0.y)) / max(length(p1-p0), 0.001);
+float distToBot = abs((p2.x-p3.x)*(p3.y-fragPos.y) - (p3.x-fragPos.x)*(p2.y-p3.y)) / max(length(p2-p3), 0.001);
+float v = distToTop / max(distToTop + distToBot, 0.001);
+vec2 leftPt = mix(p0, p3, v);
+vec2 rightPt = mix(p1, p2, v);
+vec2 hLine = rightPt - leftPt;
+float hLen = dot(hLine, hLine);
+float u = (hLen > 0.001) ? dot(fragPos - leftPt, hLine) / hLen : 0.5;
+u = clamp(u, 0.0, 1.0);
+v = clamp(v, 0.0, 1.0);
+vec2 srcUV;
+if (isFrontFace) {
+srcUV = vec2((fCol + u) / numCols, (fRow + v) / numRows);
+} else {
+if (flipAxis == 0) srcUV = vec2((fCol + u) / numCols, (fRow + (1.0 - v)) / numRows);
+else               srcUV = vec2((fCol + (1.0 - u)) / numCols, (fRow + v) / numRows);
+}
+srcUV = clamp(srcUV, vec2(0.0), vec2(1.0));
+vec4 cardCol;
+if (!isFrontFace) {
+if (backMode == 0) cardCol = texture2DCv(inputImg.texture, srcUV);
+else if (backMode == 1) cardCol = vec4(backColor.rgb, 1.0);
+else cardCol = vec4(0.0);
+} else {
+cardCol = texture2DCv(inputImg.texture, srcUV);
+}
+if (!isFrontFace && backMode == 2) continue;
+if (lightEnabled && cardCol.a > 0.01) {
+vec3 lightD = normalize(vec3(-0.3, -0.5, 0.8));
+vec3 n = isFrontFace ? normal : -normal;
+float nDotL = max(dot(n, lightD), 0.0);
+float diff = nDotL * diffuse * 0.01;
+float amb = ambient * 0.01;
+vec3 halfV = normalize(lightD + vec3(0.0, 0.0, -1.0));
+float spec = pow(max(dot(n, halfV), 0.0), 16.0) * specular * 0.01;
+float lighting = amb + diff + spec;
+cardCol.rgb *= lighting;
+}
+bestDepth = avgZ;
+result = cardCol;
+hitAny = true;
+}
+}
+if (!hitAny) gl_FragColor = vec4(0.0);
+else gl_FragColor = clamp(result, 0.0, 1.0);
+}]]></shader>
+</effect>

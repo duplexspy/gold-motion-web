@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect id="com.gmfx.effects.radar" name="GM Radar Sweep" desc="Military radar screen with rotating sweep beam, fading blips and scan grid" category="procedural" tags="radar,military,sweep,sonar,tech" overdraw="false" thumb="thumb/gm/gmradar.webp">
+<params>
+<texture id="inputImg" srcType="content"/>
+<section text="SWEEP"/>
+<spinner id="radarSpeed" default="0.4" min="0.0" max="3.0" step="0.05" label="Sweep Speed"/>
+<spinner id="sweepTrail" default="1.2" min="0.2" max="4.0" step="0.05" label="Trail Length"/>
+<spinner id="radarRange" default="46.0" min="10.0" max="70.0" step="1.0" label="Radar Radius" type="percent"/>
+<spinner id="radarCX" default="50.0" min="0.0" max="100.0" step="0.5" label="Center X" type="percent"/>
+<spinner id="radarCY" default="50.0" min="0.0" max="100.0" step="0.5" label="Center Y" type="percent"/>
+<section text="SCREEN"/>
+<color id="radarGreen" default="#39FF6A" label="Radar Color" alpha="false"/>
+<spinner id="blipCount" default="7.0" min="0.0" max="20.0" step="1.0" label="Blips"/>
+<spinner id="gridBright" default="0.35" min="0.0" max="1.0" step="0.01" label="Grid" type="percent"/>
+<switch id="radarOverlay" default="true" label="Overlay on Photo"/>
+</params>
+<shader type="fragment" precision="high"><![CDATA[float gmHash2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+void main(){
+vec2 uv = acScreenNorm;
+vec4 src = texture2DCv(inputImg.texture, uv);
+float aspect = max(getTexSize(inputImg.size).x / max(getTexSize(inputImg.size).y, 1.0), 0.5);
+vec2 c = vec2(radarCX * 0.01, radarCY * 0.01);
+vec2 p = (uv - c) * vec2(1.0, aspect);
+float r = length(p);
+float ang = atan(p.y, p.x);
+float rad = radarRange * 0.01;
+vec3 scr = vec3(0.005, 0.03, 0.012);
+float ringM = (1.0 - step(0.006, abs(fract(r / (rad * 0.25)) - 0.5) - 0.488)) * step(r, rad);
+float crossM = (1.0 - step(0.0035, min(abs(p.x), abs(p.y)))) * step(r, rad);
+scr += radarGreen.rgb * clamp(ringM + crossM, 0.0, 1.5) * gridBright * 0.5;
+float sweepAng = mod(acTime * radarSpeed * 6.2831853, 6.2831853);
+float blips = 0.0;
+for (int i = 0; i < 20; i++) {
+if (float(i) >= blipCount) break;
+float h = gmHash2(vec2(float(i) * 3.1, 7.7));
+float h2 = gmHash2(vec2(float(i) * 9.7, 2.3));
+float br = pow(h2, 0.7) * rad * 0.92;
+float ba = h * 6.2831853;
+vec2 bp = vec2(cos(ba), sin(ba)) * br;
+float d = length(p - bp);
+float blipCore = exp(-d * d * 2600.0);
+float dA = mod(sweepAng - ba + 6.2831853, 6.2831853);
+float glow = exp(-dA * 2.2 / sweepTrail);
+blips += blipCore * glow;
+}
+float rel = mod(sweepAng - ang + 6.2831853, 6.2831853);
+float beam = exp(-rel * 5.0 / sweepTrail) * step(r, rad);
+float lead = exp(-rel * 40.0) * step(r, rad);
+scr += radarGreen.rgb * (beam * 0.5 + lead * 0.9 + blips * 1.6) * step(0.0, 1.0);
+scr *= 1.0 - 0.35 * (r / max(rad, 0.01));
+if (radarOverlay) {
+float m = step(r, rad);
+vec3 col = src.rgb * (1.0 - m * 0.85) + scr * src.a;
+gl_FragColor = vec4(col, src.a);
+} else {
+gl_FragColor = vec4(scr * src.a, src.a);
+}
+}]]></shader>
+</effect>

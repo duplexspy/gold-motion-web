@@ -1,0 +1,115 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<effect id="com.alightcreative.effects.rotating_particles_3d"
+name="3D Particles"
+desc="Procedural glowing particles rotating in 3D space"
+category="3d"
+thumb="thumb/particles.webp"
+tags="3d,particles,rotation,glow">
+<params>
+<texture id="inputTexture" srcType="content" label="Custom Texture" />
+<section text="Rotation" />
+<spinner id="angle_x" default="0.5" min="-3600.0" max="3600.0" step="0.01" label="Rotate X" />
+<spinner id="angle_y" default="0.5" min="-3600.0" max="3600.0" step="0.01" label="Rotate Y" />
+<spinner id="angle_z" default="0.0" min="-3600.0" max="3600.0" step="0.01" label="Rotate Z" />
+<section text="Position" />
+<spinner id="posX" default="0.0" min="-2000.0" max="2000.0" step="0.01" label="Position X" />
+<spinner id="posY" default="0.0" min="-2000.0" max="2000.0" step="0.01" label="Position Y" />
+<spinner id="posZ" default="0.0" min="-2000.0" max="2000.0" step="0.01" label="Position Z" />
+<section text="Style" />
+<spinner id="spread" default="2.0" min="0.5" max="500.0" step="0.1" label="Particle Spread" />
+<spinner id="count" default="80.0" min="1.0" max="200.0" step="1.0" label="Particle Count" />
+<spinner id="pSize" default="1.0" min="0.1" max="10.0" step="0.1" label="Particle Size" />
+<selector id="shapeType" default="0" label="Particle Shape">
+<choice value="0" label="Glow" />
+<choice value="1" label="Circle" />
+<choice value="2" label="Square" />
+<choice value="3" label="Star" />
+<choice value="4" label="Streak" />
+<choice value="5" label="Custom" />
+</selector>
+<section text="Color" />
+<color id="colorNear" default="#FFFFFF" label="Color Near" alpha="false" />
+<color id="colorFar" default="#FF00FF" label="Color Far" alpha="false" />
+<spinner id="depthMix" default="1.0" min="0.0" max="1.0" step="0.01" label="Depth Color Mix" />
+<spinner id="hueFreq" default="0.0" min="0.0" max="5.0" step="0.1" label="Hue Shift Speed" />
+</params>
+<shader type="fragment" precision="high"><![CDATA[vec3 hsv2rgb(vec3 c) {
+vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+vec3 rgb2hsv(vec3 c) {
+vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+float d = q.x - min(q.w, q.y);
+float e = 1.0e-10;
+return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+}
+void main() {
+vec2 uv = (acLayerNorm * acLayerSize - 0.5 * acLayerSize) / acLayerSize.y;
+vec4 accumulated = vec4(0.0);
+float cx = cos(angle_x), sx = sin(angle_x);
+float cy = cos(angle_y), sy = sin(angle_y);
+float cz = cos(angle_z), sz = sin(angle_z);
+mat3 rx = mat3(1,0,0, 0,cx,-sx, 0,sx,cx);
+mat3 ry = mat3(cy,0,sy, 0,1,0, -sy,0,cy);
+mat3 rz = mat3(cz,-sz,0, sz,cz,0, 0,0,1);
+mat3 rot = rz * ry * rx;
+for(float i=0.0; i<64.0; i++) {
+if (i >= count) break;
+vec3 p = vec3(
+fract(sin(i*123.45)*456.78),
+fract(sin(i*234.56)*567.89),
+fract(sin(i*345.67)*678.90)
+);
+p = (p - 0.5) * spread;
+p += vec3(
+sin(acTime + p.y * 2.0) * 0.1,
+cos(acTime * 0.8 + p.x * 1.5) * 0.1,
+sin(acTime * 1.2 + p.z * 3.0) * 0.1
+);
+vec3 pos = (rot * p) + vec3(posX, posY, posZ);
+float cameraDist = 3.5;
+float z = pos.z + cameraDist;
+if(z > 0.1) {
+vec2 projPos = pos.xy / z;
+vec2 rel = uv - projPos;
+float normZ = clamp((z - 0.1) / 5.0, 0.0, 1.0);
+vec3 pCol = mix(colorNear.rgb, colorFar.rgb, normZ * depthMix);
+if (hueFreq > 0.0) {
+vec3 hsv = rgb2hsv(pCol);
+hsv.x = fract(hsv.x + acTime * hueFreq + i * 0.02);
+pCol = hsv2rgb(hsv);
+}
+float brightness = 0.0;
+vec4 texCol = vec4(1.0);
+if (shapeType == 0) {
+brightness = (0.0015 * pSize) / (dot(rel, rel) + 0.00005);
+} else if (shapeType == 1) {
+float s = 0.01 * pSize / z;
+brightness = smoothstep(s, s * 0.8, length(rel)) * 5.0;
+} else if (shapeType == 2) {
+float s = 0.01 * pSize / z;
+brightness = smoothstep(s, s * 0.8, max(abs(rel.x), abs(rel.y))) * 5.0;
+} else if (shapeType == 3) {
+float s = 0.015 * pSize / z;
+float dStar = min(abs(rel.x), abs(rel.y)) + length(rel) * 0.6;
+brightness = smoothstep(s, s * 0.5, dStar) * 10.0;
+} else if (shapeType == 4) {
+brightness = (0.0015 * pSize) / (rel.x*rel.x * 20.0 + rel.y*rel.y + 0.00005);
+} else {
+float s = 0.05 * pSize / z;
+vec2 texUV = rel / (s * 2.0) + 0.5;
+if (texUV.x >= 0.0 && texUV.x <= 1.0 && texUV.y >= 0.0 && texUV.y <= 1.0) {
+texCol = texture2DCv(inputTexture.texture, texUV);
+brightness = texCol.a * 1.5;
+}
+}
+accumulated += vec4(pCol * brightness * texCol.rgb, brightness) * (1.0 / (z*z));
+}
+}
+vec3 finalCol = pow(accumulated.rgb, vec3(0.4545));
+gl_FragColor = vec4(finalCol, clamp(accumulated.a, 0.0, 1.0));
+}]]></shader>
+</effect>

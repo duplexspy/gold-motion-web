@@ -1,0 +1,62 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="custom.fbm_time_displace_fade"
+name="FBM Time Displace Fade"
+desc="FBM-driven horizontal/vertical displacement over time with procedural fade mask."
+category="distort"
+thumb="thumb/fbmfade.webp"
+experimental="false">
+<params>
+<texture id="inputImg" srcType="content" label="Image" />
+<section text="Animation" />
+<spinner id="time" default="0.0" min="0.0" max="10000.0" label="Time" step="0.001" />
+<spinner id="timeDiv" default="2.0" min="0.1" max="10.0" label="Time Divisor (fract iTime/Div)" step="0.01" />
+<spinner id="timeScale" default="3.0" min="0.1" max="10.0" label="Secondary Time Scale (iTime/Scale)" step="0.01" />
+<section text="FBM" />
+<spinner id="fbmScale" default="50.0" min="1.0" max="500.0" label="FBM Pixel Scale" step="0.1" />
+<spinner id="dispClamp" default="0.3333" min="0.0" max="2.0" label="Displacement Clamp" step="0.001" />
+<section text="Mix" />
+<spinner id="fadeBias" default="1.0" min="0.0" max="3.0" label="Fade Bias" step="0.01" />
+</params>
+<shader type="fragment" precision="high"><![CDATA[float random(vec2 _st){
+return fract(sin(dot(_st.xy, vec2(12.9898,78.233))) * 43758.5453123);
+}
+float noise2d(vec2 _st){
+vec2 i = floor(_st);
+vec2 f = fract(_st);
+float a = random(i);
+float b = random(i + vec2(1.0, 0.0));
+float c = random(i + vec2(0.0, 1.0));
+float d = random(i + vec2(1.0, 1.0));
+vec2 u = f * f * (3.0 - 2.0 * f);
+return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+}
+#define NUM_OCTAVES 5
+float fbm(vec2 _st){
+float v = 0.0;
+float a = 0.5;
+vec2 shift = vec2(100.0);
+mat2 rot = mat2(cos(0.5), sin(0.5), -sin(0.5), cos(0.50));
+for (int i = 0; i < NUM_OCTAVES; ++i) {
+v += a * noise2d(_st);
+_st = rot * _st * 2.0 + shift;
+a *= 0.5;
+}
+return v;
+}
+float workingPow3(float x){ return x * x * x; }
+void main(){
+vec2 res = acScreenSize;
+vec2 fragCoord = acScreenNorm * res;
+vec2 uv = fragCoord / res;
+float modifiedTime = workingPow3(fract(time / max(timeDiv, 0.0001)) - 0.5) * 4.0;
+float timeB = time / max(timeScale, 0.0001);
+(void)timeB;
+float verticalDisp   = clamp(fbm(fragCoord / fbmScale)    * modifiedTime, -1.0, 1.0) / max(dispClamp, 0.0001);
+float horizontalDisp = clamp(fbm(fragCoord.yx / fbmScale) * modifiedTime, -1.0, 1.0) / max(dispClamp, 0.0001);
+vec2 offsetCoords = uv - vec2(horizontalDisp, verticalDisp);
+vec4 tex = texture2DCv(inputImg.texture, offsetCoords);
+float mask = clamp(tex.a * (1.0 - (abs(modifiedTime) * 2.0 + fbm(uv * 3.0))) * fadeBias, 0.0, 1.0);
+vec3 outRGB = mix(vec3(0.0), tex.rgb, mask);
+gl_FragColor = vec4(outRGB, 1.0);
+}]]></shader>
+</effect>

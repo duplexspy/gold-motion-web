@@ -1,0 +1,96 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="alightcreative.effects.advanced_sharpen"
+        name="S_Sharpen"
+        desc="Sharpen effect with multi-level detail and per-channel controls. Inspired by professional video editors."
+        category="enhance"
+        thumb="thumb/advanced_sharpen.webp"
+        experimental="false">
+
+    <params>
+        <texture id="inputImg" srcType="content" />
+        <spinner id="sharpenAmp" default="1.0" min="0.0" max="5.0" label="Sharpen Amp" step="0.01" />
+        <spinner id="edgeThresh" default="0.15" min="0.0" max="1.0" label="Edge Threshold" step="0.01" />
+        <spinner id="smallDetailSize" default="2.4" min="0.5" max="8.0" label="Small Detail Size" step="0.01" />
+
+        <section text="Detail Levels" />
+        <spinner id="scaleTiny" default="3.0" min="0.0" max="5.0" label="Scale Tiny Details" step="0.01" />
+        <spinner id="scaleSmall" default="1.5" min="0.0" max="5.0" label="Scale Small Details" step="0.01" />
+        <spinner id="scaleMedium" default="1.0" min="0.0" max="5.0" label="Scale Medium Details" step="0.01" />
+        <spinner id="scaleLarge" default="2.0" min="0.0" max="5.0" label="Scale Large Details" step="0.01" />
+
+        <spinner id="sharpenLuma" default="1.0" min="0.0" max="3.0" label="Sharpen Luma" step="0.01" />
+        <spinner id="sharpenChroma" default="1.0" min="0.0" max="3.0" label="Sharpen Chroma" step="0.01" />
+        <spinner id="sharpenRed" default="1.0" min="0.0" max="3.0" label="Sharpen Red" step="0.01" />
+        <spinner id="sharpenGreen" default="1.0" min="0.0" max="3.0" label="Sharpen Green" step="0.01" />
+        <spinner id="sharpenBlue" default="1.0" min="0.0" max="3.0" label="Sharpen Blue" step="0.01" />
+    </params>
+
+    <shader type="fragment" precision="high"><![CDATA[
+        // Multi-level advanced sharpen with per-channel and detail controls
+        vec3 rgb2ycbcr(vec3 c) {
+            float y  = dot(c, vec3(0.299, 0.587, 0.114));
+            float cb = (c.b - y) * 0.564 + 0.5;
+            float cr = (c.r - y) * 0.713 + 0.5;
+            return vec3(y, cb, cr);
+        }
+        vec3 ycbcr2rgb(vec3 ycc) {
+            float y = ycc.x;
+            float cb = ycc.y - 0.5;
+            float cr = ycc.z - 0.5;
+            float r = y + 1.403 * cr;
+            float g = y - 0.344 * cb - 0.714 * cr;
+            float b = y + 1.773 * cb;
+            return vec3(r, g, b);
+        }
+        void main() {
+            vec2 uv = acScreenNorm;
+            vec4 orig = texture2DCv(inputImg.texture, uv);
+            float px = 1.0 / acLayerSize.x;
+            float py = 1.0 / acLayerSize.y;
+            // Multi-scale detail extraction
+            vec3 tiny = texture2DCv(inputImg.texture, uv + vec2(px,0)).rgb - orig.rgb;
+            tiny += texture2DCv(inputImg.texture, uv - vec2(px,0)).rgb - orig.rgb;
+            tiny += texture2DCv(inputImg.texture, uv + vec2(0,py)).rgb - orig.rgb;
+            tiny += texture2DCv(inputImg.texture, uv - vec2(0,py)).rgb - orig.rgb;
+            tiny *= 0.25 * scaleTiny;
+
+            float smallR = smallDetailSize * 0.5 * px;
+            vec3 small = texture2DCv(inputImg.texture, uv + vec2(smallR,0)).rgb - orig.rgb;
+            small += texture2DCv(inputImg.texture, uv - vec2(smallR,0)).rgb - orig.rgb;
+            small += texture2DCv(inputImg.texture, uv + vec2(0,smallR)).rgb - orig.rgb;
+            small += texture2DCv(inputImg.texture, uv - vec2(0,smallR)).rgb - orig.rgb;
+            small *= 0.25 * scaleSmall;
+
+            float medR = smallDetailSize * px;
+            vec3 medium = texture2DCv(inputImg.texture, uv + vec2(medR,0)).rgb - orig.rgb;
+            medium += texture2DCv(inputImg.texture, uv - vec2(medR,0)).rgb - orig.rgb;
+            medium += texture2DCv(inputImg.texture, uv + vec2(0,medR)).rgb - orig.rgb;
+            medium += texture2DCv(inputImg.texture, uv - vec2(0,medR)).rgb - orig.rgb;
+            medium *= 0.25 * scaleMedium;
+
+            float largeR = smallDetailSize * 2.0 * px;
+            vec3 large = texture2DCv(inputImg.texture, uv + vec2(largeR,0)).rgb - orig.rgb;
+            large += texture2DCv(inputImg.texture, uv - vec2(largeR,0)).rgb - orig.rgb;
+            large += texture2DCv(inputImg.texture, uv + vec2(0,largeR)).rgb - orig.rgb;
+            large += texture2DCv(inputImg.texture, uv - vec2(0,largeR)).rgb - orig.rgb;
+            large *= 0.25 * scaleLarge;
+
+            // Combine all detail levels
+            vec3 detail = tiny + small + medium + large;
+            // Edge threshold (suppress sharpening on low-contrast areas)
+            float edge = length(detail);
+            float edgeMask = smoothstep(edgeThresh, edgeThresh+0.1, edge);
+            detail *= edgeMask * sharpenAmp;
+
+            // Per-channel and luma/chroma sharpening
+            vec3 ycc = rgb2ycbcr(orig.rgb);
+            ycc.x += dot(detail, vec3(0.299, 0.587, 0.114)) * sharpenLuma;
+            ycc.yz += detail.yz * sharpenChroma * 0.5;
+            vec3 rgb = ycbcr2rgb(ycc);
+            rgb.r += detail.r * sharpenRed;
+            rgb.g += detail.g * sharpenGreen;
+            rgb.b += detail.b * sharpenBlue;
+            gl_FragColor = vec4(rgb, orig.a);
+        }
+    ]]></shader>
+</effect>

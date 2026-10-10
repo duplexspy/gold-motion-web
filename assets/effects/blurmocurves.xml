@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect id="com.alightcreative.effects.smooth_transform_tileshift"
+name="blurmocurves"
+desc="Smooth transformation with optional tile displacement and blur"
+category="transform"
+tags="transform,tile,blur"
+thumb="thumb/blurmocurves.webp">
+<params>
+<spinner id="posz" default="1" min="0.001" max="30" step="0.005" label="Z Dist" />
+<spinner id="posx" default="0" min="-8192" max="8192" step="0.5" label="Shift X" />
+<spinner id="posy" default="0" min="-8192" max="8192" step="0.5" label="Shift Y" />
+<spinner id="angle" default="0.0" min="-3600" max="3600" label="Rotate" step="0.5" type="angle" />
+<switch id="zinv" default="false" label="Invert Z" />
+<switch id="xinv" default="false" label="Invert X" />
+<switch id="yinv" default="false" label="Invert Y" />
+<switch id="ainv" default="false" label="Invert Angle" />
+<switch id="tileEnable" default="false" label="Enable TileShift" />
+<spinner id="tileStrength" default="0.1" min="0.0" max="1.0" step="0.01" label="Tile Strength" />
+<spinner id="tileAmount" default="10.0" min="1.0" max="200.0" step="0.5" label="Tile Count" />
+<spinner id="tileSeed" default="0.0" min="0.0" max="5.0" step="0.01" label="Tile Random Seed" />
+<spinner id="motionBlurAmount" default="0.3" min="0.0" max="1.0" step="0.01" label="Motion Blur Amount"/>
+</params>
+<script lang="js"><![CDATA[function animate(env, el, p) {
+var x = p.xinv ? -p.posx : p.posx;
+var y = p.yinv ? -p.posy : p.posy;
+var z = p.zinv ? 1 + (1 - p.posz) : p.posz;
+var a = p.ainv ? -p.angle : p.angle;
+el.transform.location.x += x;
+el.transform.location.y += y;
+el.transform.angle += a;
+el.transform.scale.x += z - 1;
+el.transform.scale.y += z - 1;
+return el;
+}]]></script>
+<pass name="tileShift">
+<param id="inputImg" type="texture"/>
+<param id="tileEnable" type="bool"/>
+<param id="tileStrength" type="float"/>
+<param id="tileAmount" type="float"/>
+<param id="tileSeed" type="float"/>
+<shader><![CDATA[uniform sampler2D inputImg;
+uniform bool tileEnable;
+uniform float tileStrength;
+uniform float tileAmount;
+uniform float tileSeed;
+varying vec2 uv;
+float rand(vec2 co) {
+float a = 719.31;
+float b = 178.233;
+float c = 33758.5453;
+float dt = dot(co.xy, vec2(a, b));
+float sn = mod(dt, 3.14);
+return fract(sin(sn) * c);
+}
+void main() {
+vec2 uv_out = uv;
+if (tileEnable) {
+vec2 st = uv - 0.5;
+float px = floor(st.x * tileAmount);
+float py = floor(st.y * tileAmount);
+float dx = rand(vec2(px, py + 3937.7249 * tileSeed));
+float dy = rand(vec2(px + 328.7319 + 432.7249 * tileSeed, py - 971.382));
+vec2 dv = (vec2(dx, dy) - 0.5) * 2.0;
+uv_out += dv * tileStrength;
+uv_out = abs(mod(uv_out - 1.0, 2.0) - 1.0);
+}
+gl_FragColor = texture2D(inputImg, uv_out);
+}]]></shader>
+</pass>
+<pass name="motionBlur" depends="tileShift">
+<param id="inputImg" type="texture"/>
+<param id="motionBlurAmount" type="float"/>
+<shader><![CDATA[uniform sampler2D inputImg;
+uniform float motionBlurAmount;
+varying vec2 uv;
+void main() {
+vec4 color = vec4(0.0);
+float samples = 5.0;
+float blurSize = motionBlurAmount * 0.02;
+for (float i = 0.0; i < samples; i++) {
+float offset = (i - 2.0) * blurSize;
+color += texture2D(inputImg, uv + vec2(offset, 0.0));
+}
+gl_FragColor = color / samples;
+}]]></shader>
+</pass>
+</effect>

@@ -1,0 +1,91 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.advsharpen"
+        name="Advanced Sharpen"
+        desc="Multi-scale sharpening with detail control, luma/chroma separation, and per-channel tuning."
+        category="blur_sharpen"
+        thumb="thumb/sharpen.webp"
+        experimental="false">
+
+    <params>
+        <texture id="inputImg" srcType="content" />
+
+        <!-- Global -->
+        <spinner id="sharpenAmp" default="1.0" min="0.0" max="5.0" label="Sharpen Amp" step="0.01" />
+        <spinner id="edgeThreshold" default="0.15" min="0.0" max="1.0" label="Edge Threshold" step="0.01" />
+        <spinner id="detailSize" default="2.4" min="0.1" max="10.0" label="Small Detail Size" step="0.1" />
+
+        <!-- Detail Scales -->
+        <spinner id="tinyScale" default="3.0" min="0.0" max="5.0" label="Scale Tiny Details" step="0.01" />
+        <spinner id="smallScale" default="1.5" min="0.0" max="5.0" label="Scale Small Details" step="0.01" />
+        <spinner id="mediumScale" default="1.0" min="0.0" max="5.0" label="Scale Medium Details" step="0.01" />
+        <spinner id="largeScale" default="2.0" min="0.0" max="5.0" label="Scale Large Details" step="0.01" />
+
+        <!-- Luma / Chroma -->
+        <spinner id="sharpenLuma" default="1.0" min="0.0" max="2.0" label="Sharpen Luma" step="0.01" />
+        <spinner id="sharpenChroma" default="1.0" min="0.0" max="2.0" label="Sharpen Chroma" step="0.01" />
+
+        <!-- RGB channels -->
+        <spinner id="sharpenR" default="1.0" min="0.0" max="2.0" label="Sharpen Red" step="0.01" />
+        <spinner id="sharpenG" default="1.0" min="0.0" max="2.0" label="Sharpen Green" step="0.01" />
+        <spinner id="sharpenB" default="1.0" min="0.0" max="2.0" label="Sharpen Blue" step="0.01" />
+    </params>
+
+    <shader type="fragment" precision="high"><![CDATA[
+        // Advanced Multi-Scale Sharpen
+        // Inspired by AE/Topaz detail sharpening
+
+        vec4 sampleOffset(vec2 uv, vec2 offset) {
+            return texture2D(inputImg, uv + offset);
+        }
+
+        // Gaussian blur approximation
+        vec4 blur(vec2 uv, float radius) {
+            vec2 texel = 1.0 / acProjectSize;
+            vec4 sum = vec4(0.0);
+            sum += sampleOffset(uv, texel * vec2(-radius, 0.0));
+            sum += sampleOffset(uv, texel * vec2(radius, 0.0));
+            sum += sampleOffset(uv, texel * vec2(0.0, -radius));
+            sum += sampleOffset(uv, texel * vec2(0.0, radius));
+            sum += texture2D(inputImg, uv);
+            return sum / 5.0;
+        }
+
+        void main() {
+            vec2 uv = vTexCoord;
+            vec4 base = texture2D(inputImg, uv);
+
+            // Multi-scale high-pass details
+            vec4 tiny   = base - blur(uv, detailSize * 0.25);
+            vec4 small  = base - blur(uv, detailSize * 0.5);
+            vec4 medium = base - blur(uv, detailSize * 1.0);
+            vec4 large  = base - blur(uv, detailSize * 2.0);
+
+            // Weighted detail mix
+            vec4 detailMix = tiny * tinyScale +
+                             small * smallScale +
+                             medium * mediumScale +
+                             large * largeScale;
+
+            // Edge thresholding
+            float edgeMask = step(edgeThreshold, length(detailMix.rgb));
+            detailMix *= edgeMask;
+
+            // Luma/Chroma separation
+            float luma = dot(base.rgb, vec3(0.299, 0.587, 0.114));
+            vec3 chroma = base.rgb - luma;
+
+            float sharpenedLuma = luma + dot(detailMix.rgb, vec3(0.333)) * sharpenLuma * sharpenAmp;
+            vec3 sharpenedChroma = chroma + detailMix.rgb * sharpenChroma * sharpenAmp;
+
+            // Reconstruct color
+            vec3 sharpened = vec3(sharpenedLuma) + sharpenedChroma;
+
+            // Apply RGB multipliers
+            sharpened.r *= sharpenR;
+            sharpened.g *= sharpenG;
+            sharpened.b *= sharpenB;
+
+            gl_FragColor = vec4(sharpened, base.a);
+        }
+    ]]></shader>
+</effect>

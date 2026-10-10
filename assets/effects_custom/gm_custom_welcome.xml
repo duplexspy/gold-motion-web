@@ -1,0 +1,29 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="gm.custom.welcome" name="GM Custom FX" desc="The starting effect for the Custom category. Import your own effect XML with the + button at the top of this category." category="custom" thumb="thumb/gm_custom_welcome.webp" tags="gm,custom,welcome">
+<params>
+<texture id="inputImg" srcType="content" />
+<section text="GM Custom FX" />
+<spinner id="amount" default="0.65" min="0.0" max="1.0" label="Amount" step="0.01" />
+<spinner id="pulseSpeed" default="1.20" min="0.0" max="5.0" label="Pulse Speed" step="0.05" />
+<spinner id="goldTint" default="0.55" min="0.0" max="1.0" label="Gold Tint" step="0.01" />
+<color id="warmColor" default="#FFF2C94C" label="Warm Color" />
+<switch id="vignetteOn" default="true" label="Add Vignette" />
+<section text="MOD BY PNKJ" />
+</params>
+<shader type="fragment" precision="high"><![CDATA[vec4 sampleLayer(vec2 uv){ return texture2DCv(inputImg.texture, uv); }
+void main(){
+vec2 uv = acScreenNorm;
+vec4 src = sampleLayer(uv);
+float pulse = 0.5 + 0.5 * sin(acTime * pulseSpeed * 6.2831853);
+float g = amount * pulse;
+vec3 gold = warmColor.rgb;
+vec3 graded = mix(src.rgb, src.rgb * gold * 1.6, goldTint);
+vec3 outRgb = mix(graded, graded + gold * 0.35, g);
+if (vignetteOn) {
+    vec2 d = uv - vec2(0.5);
+    float vig = 1.0 - smoothstep(0.25, 0.85, length(d) * 1.4);
+    outRgb *= mix(0.65, 1.0, vig);
+}
+gl_FragColor = vec4(clamp(outRgb, 0.0, 1.0), src.a);
+}]]></shader>
+</effect>

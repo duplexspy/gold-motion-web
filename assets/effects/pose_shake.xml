@@ -1,0 +1,19 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.custom.effects.New_shake" name="pose shake" desc="XY and rotation shake driven by sin(time · gamma · beta)" auto-transform="true" category="transform"
+thumb="thumb/poseshake.webp" tags="transform,auto,shake,sin,smooth">
+<params>
+<spinner id="Xmag"    min="0" max="500"   step="0.5"  default="25" label="X Magnitude" />
+<spinner id="Ymag"    min="0" max="500"   step="0.5"  default="25" label="Y Magnitude" />
+<spinner id="rotMag" min="0" max="180.0" step="0.1"  default="3"  label="Rotation Magnitude" type="angle" />
+<spinner id="gamma"  min="0" max="30"    step="0.1"  default="12" label="Gamma (frequency)" />
+<spinner id="beta"   min="0" max="5"     step="0.01" default="1"  label="Beta (intensity)" />
+</params>
+<script lang="js"><![CDATA[function animate(env, el, p) {
+var t = env.frame / env.fps;
+var freq = p.gamma * p.beta;
+el.transform.location.x += Math.sin(t * freq)         * p.Xmag;
+el.transform.location.y += Math.sin(t * freq + 1.047) * p.Ymag * 0.7;
+el.transform.angle      += Math.sin(t * freq + 2.094) * p.rotMag;
+return el;
+}]]></script>
+</effect>

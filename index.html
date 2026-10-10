@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0c0d12">
+  <meta name="description" content="Gold Motion Web - Professional Motion Graphics, VFX, 3D Labs Studio, and XML Keyframe Animation in your browser.">
+  <link rel="icon" type="image/png" href="./icons/ic_launcher_round.png">
+  <title>Gold Motion - Pro Motion Graphics &amp; VFX Studio</title>
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+
+  <!-- Top App Header -->
+  <header class="gm-app-header">
+    <div class="gm-brand-group" id="gmHeaderBrand">
+      <img src="./icons/ic_launcher_round.png" alt="Gold Motion Logo" class="gm-logo-img">
+      <span class="gm-brand-title">GOLD MOTION</span>
+      <span class="gm-badge-pro">PRO 8.5</span>
+    </div>
+
+    <div class="gm-header-actions">
+      <button class="gm-btn" id="gmHeaderNavHome" title="Home Dashboard">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span class="gm-btn-text">Home</span>
+      </button>
+
+      <button class="gm-btn" id="gmHeaderNavEditor" title="Motion Graphics Studio Editor">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        <span class="gm-btn-text">Studio</span>
+      </button>
+
+      <button class="gm-btn" id="gmHeaderNavTools" title="Extra Tools Studio">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        <span class="gm-btn-text">Tools</span>
+      </button>
+
+      <label class="gm-btn" for="gmXmlImportInput" style="cursor: pointer;" title="Import Gold Motion / Alight XML project">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span class="gm-btn-text">Import XML</span>
+      </label>
+      <input type="file" id="gmXmlImportInput" accept=".xml,.amproject" style="display: none;">
+
+      <button class="gm-btn" id="gmSaveBackupBtn" title="Download Full Project Backup (JSON/XML)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        <span class="gm-btn-text">Backup</span>
+      </button>
+
+      <button class="gm-btn gm-btn-gold" id="gmExportHeaderBtn" title="Render & Export Video, GIF, or XML">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        <span>Export</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- App Main View Container -->
+  <main class="gm-main-container">
+
+    <!-- 1. HOME DASHBOARD PAGE -->
+    <div class="gm-page active" id="gmHomePage">
+      <!-- Hero Banner -->
+      <section class="gm-home-hero">
+        <h1 class="gm-home-title">Create <span>Golden</span> Motion</h1>
+        <p class="gm-home-subtitle">
+          The ultimate motion graphics and visual effects experience ported directly from Gold Motion APK.
+          Featuring 930+ procedural GLSL shaders, 3D Labs Studio, Cubic-Bezier easing, and native XML project workflows.
+        </p>
+
+        <!-- Quick Start Action Cards -->
+        <div class="gm-home-quick-actions">
+          <div class="gm-quick-card" id="gmHomeNewProject">
+            <div class="gm-quick-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </div>
+            <div class="gm-quick-text">
+              <h4>New Project</h4>
+              <p>Custom aspect ratio &amp; FPS</p>
+            </div>
+          </div>
+
+          <div class="gm-quick-card" id="gmHomeOpenEditor">
+            <div class="gm-quick-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            </div>
+            <div class="gm-quick-text">
+              <h4>Open Editor</h4>
+              <p>Timeline &amp; Canvas Studio</p>
+            </div>
+          </div>
+
+          <div class="gm-quick-card" id="gmHomeOpenLabs">
+            <div class="gm-quick-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 L20 7.5 L12 12 L4 7.5 Z"/><path d="M4 7.5 L12 12 L12 21 L4 16.5 Z"/><path d="M20 7.5 L12 12 L12 21 L20 16.5 Z"/></svg>
+            </div>
+            <div class="gm-quick-text">
+              <h4>3D Labs Studio</h4>
+              <p>GmQuadTess &amp; Particles</p>
+            </div>
+          </div>
+
+          <div class="gm-quick-card" id="gmHomeOpenTools">
+            <div class="gm-quick-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M14.31 8l5.74 9.94M9.69 8h11.48M7.38 12l5.74-9.94M9.69 16L3.95 6.06M14.31 16H2.83M16.62 12l-5.74 9.94"/></svg>
+            </div>
+            <div class="gm-quick-text">
+              <h4>Extra Tools</h4>
+              <p>AI Upscale &amp; Cutout</p>
+            </div>
+          </div>
+
+          <div class="gm-quick-card" id="gmHomeOpenTemplates">
+            <div class="gm-quick-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+            </div>
+            <div class="gm-quick-text">
+              <h4>Templates</h4>
+              <p>Intros, VFX &amp; Kinetic</p>
+            </div>
+          </div>
+
+          <label class="gm-quick-card" for="gmXmlImportInput" style="cursor: pointer;">
+            <div class="gm-quick-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            </div>
+            <div class="gm-quick-text">
+              <h4>Import XML</h4>
+              <p>Load beta_anim or project</p>
+            </div>
+          </label>
+        </div>
+      </section>
+
+      <!-- Safety & Storage Info Banner -->
+      <section style="padding: 14px 20px; background: rgba(246, 201, 69, 0.08); border-bottom: 1px solid rgba(246, 201, 69, 0.2); display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="font-size: 22px;">🛡️</span>
+          <div>
+            <h4 style="font-size: 13.5px; font-weight: 700; color: var(--gm-gold-primary);">Safe Storage &amp; Anti-Data Loss Guard Active</h4>
+            <p style="font-size: 11.5px; color: var(--gm-text-muted);">
+              All project edits, keyframe curves, and custom effects are saved to browser IndexedDB with prompt warnings before tab closing. You can also download full workspace backups anytime.
+            </p>
+          </div>
+        </div>
+        <button class="gm-btn" id="gmBackupNowBtn" style="border-color: var(--gm-gold-primary); color: var(--gm-gold-primary); flex-shrink: 0;">
+          📥 Download Full Backup (.json)
+        </button>
+      </section>
+
+      <!-- Category Icon Showcase -->
+      <section class="gm-section">
+        <div class="gm-section-header">
+          <h2 class="gm-section-title">
+            <span>✨ 32 Effect &amp; Motion Categories</span>
+          </h2>
+          <span class="gm-section-link" id="gmViewAllFxLink">Browse 930+ Presets →</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)); gap: 12px;" id="gmCategoryGrid">
+          <div class="gm-tool-card" style="padding: 12px; align-items: center; text-align: center;">
+            <img src="./icons/ic_gm_cat_01.png" style="width: 38px; height: 38px; object-fit: contain; margin-bottom: 6px;" alt="Cat 1">
+            <span style="font-size: 12px; font-weight: 700;">Color &amp; Light</span>
+          </div>
+          <div class="gm-tool-card" style="padding: 12px; align-items: center; text-align: center;">
+            <img src="./icons/ic_gm_cat_02.png" style="width: 38px; height: 38px; object-fit: contain; margin-bottom: 6px;" alt="Cat 2">
+            <span style="font-size: 12px; font-weight: 700;">Blur &amp; Defocus</span>
+          </div>
+          <div class="gm-tool-card" style="padding: 12px; align-items: center; text-align: center;">
+            <img src="./icons/ic_gm_cat_03.png" style="width: 38px; height: 38px; object-fit: contain; margin-bottom: 6px;" alt="Cat 3">
+            <span style="font-size: 12px; font-weight: 700;">Distortion &amp; Warp</span>
+          </div>
+          <div class="gm-tool-card" style="padding: 12px; align-items: center; text-align: center;">
+            <img src="./icons/ic_gm_cat_04.png" style="width: 38px; height: 38px; object-fit: contain; margin-bottom: 6px;" alt="Cat 4">
+            <span style="font-size: 12px; font-weight: 700;">3D &amp; Transform</span>
+          </div>
+          <div class="gm-tool-card" style="padding: 12px; align-items: center; text-align: center;">
+            <img src="./icons/ic_gm_cat_05.png" style="width: 38px; height: 38px; object-fit: contain; margin-bottom: 6px;" alt="Cat 5">
+            <span style="font-size: 12px; font-weight: 700;">Procedural</span>
+          </div>
+          <div class="gm-tool-card" style="padding: 12px; align-items: center; text-align: center;">
+            <img src="./icons/ic_gm_cat_06.png" style="width: 38px; height: 38px; object-fit: contain; margin-bottom: 6px;" alt="Cat 6">
+            <span style="font-size: 12px; font-weight: 700;">Drawing &amp; Edge</span>
+          </div>
+          <div class="gm-tool-card" style="padding: 12px; align-items: center; text-align: center;">
+            <img src="./icons/ic_gm_cat_07.png" style="width: 38px; height: 38px; object-fit: contain; margin-bottom: 6px;" alt="Cat 7">
+            <span style="font-size: 12px; font-weight: 700;">Text &amp; Kinetic</span>
+          </div>
+          <div class="gm-tool-card" style="padding: 12px; align-items: center; text-align: center;">
+            <img src="./icons/ic_gm_cat_08.png" style="width: 38px; height: 38px; object-fit: contain; margin-bottom: 6px;" alt="Cat 8">
+            <span style="font-size: 12px; font-weight: 700;">Opacity &amp; Mask</span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 2. STUDIO EDITOR WORKSPACE -->
+    <div class="gm-page" id="gmEditorView">
+      <!-- Editor Topbar -->
+      <div class="gm-editor-topbar">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <button class="gm-btn gm-btn-icon" id="gmEditorBackBtn" title="Back to Home">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <span style="font-weight: 700; font-size: 13.5px; color: #fff;" id="gmEditorProjectName">Gold Motion Studio</span>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button class="gm-btn gm-btn-gold" id="gmAddLayerBtn" title="Add Layer (Shape, Text, Media)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>+ Layer</span>
+          </button>
+          <button class="gm-btn" id="gmTogglePropsBtn" title="Toggle Properties Panel">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <span>Inspector</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Editor Workarea -->
+      <div class="gm-editor-workarea">
+        <!-- Viewport -->
+        <div class="gm-canvas-container" id="gmCanvasContainer">
+          <div class="gm-canvas-wrapper" id="gmCanvasWrapper">
+            <canvas id="gmMainCanvas" width="1920" height="1080"></canvas>
+          </div>
+
+          <div class="gm-canvas-overlay">
+            <button class="gm-overlay-btn" id="gmResetZoomBtn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <span>Fit</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Layer Inspector Properties Panel -->
+        <aside class="gm-properties-panel" id="gmPropertiesPanel">
+          <!-- Rendered dynamically by app.js updatePropertiesUI -->
+        </aside>
+      </div>
+
+      <!-- Editor Timeline Panel -->
+      <section class="gm-timeline-panel">
+        <div class="gm-timeline-controls">
+          <div id="gmTimecode" class="gm-timecode-display">00:00:00</div>
+
+          <div class="gm-transport-controls">
+            <button class="gm-transport-btn" id="gmPrevKfBtn" title="Previous Keyframe">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>
+            </button>
+            <button class="gm-transport-btn play-btn" id="gmPlayBtn" title="Play / Pause">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            </button>
+            <button class="gm-transport-btn" id="gmNextKfBtn" title="Next Keyframe">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
+            </button>
+          </div>
+
+          <div style="font-size: 11px; color: var(--gm-text-muted);">
+            Timeline Clock: 30 FPS
+          </div>
+        </div>
+
+        <div class="gm-timeline-content">
+          <div class="gm-track-headers" id="gmTrackHeadersList"></div>
+
+          <div class="gm-tracks-scrollable">
+            <div class="gm-ruler-canvas" id="gmRuler"></div>
+            <div class="gm-tracks-container" id="gmTracksContainer">
+              <div class="gm-playhead-line" id="gmPlayheadLine">
+                <div class="gm-playhead-handle"></div>
+              </div>
+              <div id="gmLanesList"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 3. PROJECTS PAGE MOUNT -->
+    <div id="gmProjectsPageMount"></div>
+
+    <!-- 4. 3D LABS STUDIO MOUNT -->
+    <div id="gmLabsPageRoot"></div>
+
+    <!-- 5. TEMPLATES PAGE MOUNT -->
+    <div id="gmTemplatesPageMount"></div>
+
+    <!-- 6. EXTRA TOOLS STUDIO MOUNT -->
+    <div id="gmToolsPageRoot"></div>
+
+  </main>
+
+  <!-- Bottom Android Navigation Bar Mount -->
+  <footer id="gmNavMount"></footer>
+
+  <!-- Modal Mounts -->
+  <div id="gmCreateModalMount"></div>
+  <div id="gmGraphModalMount"></div>
+  <div id="gmExprModalMount"></div>
+  <div id="gmExportModalMount"></div>
+
+  <!-- Effect Catalog Modal -->
+  <div id="gmEffectCatalogModal" class="gm-modal-scrim">
+    <div class="gm-modal-card" style="max-width: 680px; height: 80vh;">
+      <div class="gm-modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 20px;">✨</span>
+          <div>
+            <h3>Effects Catalog (930+ Presets)</h3>
+            <p style="font-size: 11px; color: var(--gm-gold-primary); font-weight: 700;">Native Gold Motion Shaders &amp; GPU Filters</p>
+          </div>
+        </div>
+        <button class="gm-btn gm-btn-icon" id="gmCatalogClose">✕</button>
+      </div>
+
+      <div style="padding: 12px 20px; border-bottom: 1px solid var(--gm-border-subtle);">
+        <input type="text" id="gmCatalogSearch" placeholder="Search 930+ effects (e.g. 24K Gold, Starfield, Blur, Chroma, Glitch)…" style="width: 100%; background: var(--gm-bg-input); border: 1px solid var(--gm-border-subtle); border-radius: 10px; padding: 10px 14px; color: #fff; font-size: 13px; outline: none;">
+      </div>
+
+      <div class="gm-modal-body" style="flex: 1; overflow-y: auto; padding: 16px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px;" id="gmCatalogList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Interactive Mascot Mount -->
+  <div id="gmMascotMount"></div>
+
+  <!-- Boot Application -->
+  <script type="module" src="./js/app.js"></script>
+
+</body>
+</html>

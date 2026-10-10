@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect id="com.gmfx.effects.crossprocess" name="GM Cross Process Film" desc="E-6 in C-41 cross-processing: shifted channels, cyan shadows, warm highlights and grain" category="color" tags="crossprocess,film,vintage,experimental,ecp" overdraw="false" thumb="thumb/gm/gmcrossprocess.webp">
+<params>
+<texture id="inputImg" srcType="content"/>
+<section text="CHEMISTRY"/>
+<spinner id="cpStrength" default="85.0" min="0.0" max="100.0" step="1.0" label="Strength" type="percent"/>
+<spinner id="cpWarmth" default="0.35" min="-1.0" max="1.0" step="0.01" label="Warmth Shift"/>
+<spinner id="cpContrast" default="1.15" min="0.6" max="2.0" step="0.01" label="Contrast"/>
+<spinner id="cpSat" default="1.25" min="0.0" max="2.0" step="0.01" label="Saturation"/>
+<section text="FILM"/>
+<spinner id="cpGrain" default="0.16" min="0.0" max="0.6" step="0.01" label="Grain" type="percent"/>
+<spinner id="cpVignette" default="0.3" min="0.0" max="1.0" step="0.01" label="Vignette" type="percent"/>
+</params>
+<shader type="fragment" precision="high"><![CDATA[float gmLum(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+float gmHash2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+void main(){
+vec2 uv = acScreenNorm;
+vec4 src = texture2DCv(inputImg.texture, uv);
+vec3 c = src.rgb;
+float l = gmLum(c);
+vec3 cp;
+cp.r = clamp(c.r * 1.12 + c.g * 0.06 - c.b * 0.10 + 0.02, 0.0, 1.0);
+cp.g = clamp(c.g * 1.02 - c.r * 0.05 + c.b * 0.03, 0.0, 1.0);
+cp.b = clamp(c.b * 1.08 + c.r * 0.04 - c.g * 0.02 - 0.04, 0.0, 1.0);
+float sh = 1.0 - smoothstep(0.0, 0.5, l);
+float hi = smoothstep(0.5, 1.0, l);
+cp += vec3(0.02, 0.05, 0.07) * sh * (1.0 - cpWarmth * 0.5) + vec3(0.07, 0.035, 0.0) * hi * (0.5 + cpWarmth * 0.5);
+cp -= vec3(0.03, 0.02, 0.05) * sh * cpWarmth * 0.5;
+cp = clamp((cp - 0.5) * cpContrast + 0.5, 0.0, 1.0);
+float lp = gmLum(cp);
+cp = clamp(mix(vec3(lp), cp, cpSat), 0.0, 1.0);
+float g = gmHash2(uv * getTexSize(inputImg.size) + fract(acTime) * 53.7);
+cp += (g - 0.5) * cpGrain * 0.4;
+cp *= 1.0 - cpVignette * 0.85 * smoothstep(0.32, 0.85, length(uv - 0.5));
+vec3 col = mix(src.rgb, clamp(cp, 0.0, 1.0), cpStrength * 0.01);
+gl_FragColor = vec4(col * src.a, src.a);
+}]]></shader>
+</effect>

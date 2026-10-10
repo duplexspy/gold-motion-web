@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect id="com.gmfx.effects.confetti" name="GM Confetti Burst" desc="Celebration confetti with tumbling paper pieces, custom palette and spin" category="procedural" tags="confetti,party,celebration,paper,fun" overdraw="false" thumb="thumb/gm/gmconfetti.webp">
+<params>
+<texture id="inputImg" srcType="content"/>
+<section text="CONFETTI"/>
+<spinner id="confAmount" default="55.0" min="0.0" max="100.0" step="1.0" label="Amount" type="percent"/>
+<spinner id="confSpeed" default="1.0" min="0.1" max="4.0" step="0.05" label="Fall Speed"/>
+<spinner id="confSize" default="1.0" min="0.3" max="3.0" step="0.05" label="Piece Size"/>
+<spinner id="confSpin" default="1.4" min="0.0" max="6.0" step="0.1" label="Tumble Spin"/>
+<section text="PALETTE"/>
+<color id="confCol1" default="#FF4D6D" label="Color 1" alpha="false"/>
+<color id="confCol2" default="#FFD23F" label="Color 2" alpha="false"/>
+<color id="confCol3" default="#3BCEAC" label="Color 3" alpha="false"/>
+<color id="confCol4" default="#4D96FF" label="Color 4" alpha="false"/>
+<spinner id="confBright" default="1.0" min="0.0" max="2.0" step="0.05" label="Brightness"/>
+</params>
+<shader type="fragment" precision="high"><![CDATA[float gmHash2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+mat2 gmRot(float a){ float c = cos(a); float s = sin(a); return mat2(c, -s, s, c); }
+float gmConfetti(vec2 uv, float cols, float seed, float t, float sizePx, float spin, float aspect, float gate, out vec3 pieceCol){
+vec2 p = uv * vec2(cols, cols / max(aspect * 1.3, 0.6));
+vec2 cell = floor(p);
+float h = gmHash2(cell + seed);
+if (h < gate) { pieceCol = vec3(0.0); return 0.0; }
+vec2 f = fract(p) - 0.5;
+float h2 = gmHash2(cell * 4.3 + seed * 7.7);
+float h3 = gmHash2(cell * 9.7 + seed * 3.1);
+float fall = fract(-t * (0.6 + h2 * 0.8) + h * 11.0);
+float ang = t * spin * (0.5 + h2) + h * 6.2831;
+vec2 cpos = clamp(vec2((gmHash2(cell * 6.1 + seed) - 0.5) * 0.45, fall - 0.5), vec2(-0.32), vec2(0.32));
+vec2 q = gmRot(ang) * (f - cpos);
+float w = (0.05 + 0.08 * h3) * sizePx;
+float len = w * (1.6 + 2.4 * h2);
+vec2 dq = abs(q) - vec2(w, len);
+float m = max(dq.x, dq.y);
+float shape = (1.0 - smoothstep(0.0, 0.012 * sizePx, m));
+shape *= smoothstep(0.0, 0.12, fall) * smoothstep(1.0, 0.88, fall);
+float shade = 0.65 + 0.35 * abs(cos(ang));
+float pick = floor(h * 3.999);
+pieceCol = pick < 0.5 ? confCol1.rgb : (pick < 1.5 ? confCol2.rgb : (pick < 2.5 ? confCol3.rgb : confCol4.rgb));
+pieceCol *= shade;
+return shape;
+}
+void main(){
+vec2 uv = acScreenNorm;
+vec4 src = texture2DCv(inputImg.texture, uv);
+float aspect = max(getTexSize(inputImg.size).x / max(getTexSize(inputImg.size).y, 1.0), 0.5);
+float gate = 1.0 - confAmount * 0.01;
+vec3 pc1; vec3 pc2; vec3 pc3;
+float c1 = gmConfetti(uv, 22.0, 5.0, acTime * confSpeed, confSize, confSpin, aspect, gate, pc1);
+float c2 = gmConfetti(uv, 15.0, 29.0, acTime * confSpeed * 0.9, confSize * 1.3, confSpin * 0.8, aspect, gate, pc2);
+float c3 = gmConfetti(uv, 9.0, 61.0, acTime * confSpeed * 1.15, confSize * 1.8, confSpin * 1.2, aspect, gate, pc3);
+vec3 confetti = pc1 * c1 + pc2 * c2 + pc3 * c3;
+confetti *= confBright;
+vec3 col = src.rgb * src.a + confetti * src.a;
+gl_FragColor = vec4(col, src.a);
+}]]></shader>
+</effect>

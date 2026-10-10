@@ -1,0 +1,133 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect
+id="com.custom.effects.square_break_3d"
+name="Square Break 3D"
+desc="Layer breaks into squares that zoom forward toward the camera as Progress increases. Each square scales up and flies out of the screen in true 3D perspective. No rotation."
+category="distort"
+tags="break,shatter,squares,3d,z,depth,zoom,forward,fly,tiles,perspective"
+overdraw="true"
+max-overdraw="0.5"
+experimental="false"
+thumb="thumb/3dsq.webp"
+deprecated="false">
+<params>
+<texture id="inputImg" srcType="content" />
+<section text="Grid" />
+<spinner id="colCount"   label="Columns"           default="6.0"  min="1.0"  max="30.0"  step="1.0"  />
+<spinner id="rowCount"   label="Rows"              default="6.0"  min="1.0"  max="30.0"  step="1.0"  />
+<spinner id="gapSize"    label="Gap Size"          default="0.01" min="0.0"  max="0.1"   step="0.002"/>
+<section text="3D Animation" />
+<spinner id="progress"   label="Progress"          default="0.0"  min="0.0"  max="1.0"   step="0.005" type="percent" />
+<spinner id="zDepth"     label="Z Depth (zoom)"    default="5.0"  min="1.0"  max="20.0"  step="0.1"  />
+<spinner id="speedVar"   label="Speed Variation"   default="0.5"  min="0.0"  max="1.0"   step="0.01" type="percent" />
+<spinner id="delaySpread" label="Delay Spread"     default="0.4"  min="0.0"  max="1.0"   step="0.01" type="percent" />
+<section text="Order" />
+<selector id="breakOrder" style="dropdown" default="0" label="Break Order">
+<choice label="Random"        value="0" />
+<choice label="Center Out"    value="1" />
+<choice label="Left to Right" value="2" />
+<choice label="Top to Bottom" value="3" />
+<choice label="Corner Out"    value="4" />
+</selector>
+<section text="Look" />
+<spinner id="fadeOut"    label="Fade Out"          default="0.8"  min="0.0"  max="1.0"   step="0.01" type="percent" />
+</params>
+<shader type="fragment" precision="high"><![CDATA[#define PI 3.14159265359
+float hash1(float n){ return fract(sin(n*127.1)*43758.5453); }
+float hash2(vec2 p){  return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+vec4 sampleTex(vec2 uv){
+return texture2DCv(inputImg.texture, clamp(uv,0.0,1.0));
+}
+float tileDelay(vec2 id, vec2 grid){
+vec2 norm = id / max(grid-1.0, 1.0);
+vec2 c    = norm - 0.5;
+if(breakOrder==0) return hash2(id);
+if(breakOrder==1) return length(c)*1.414;
+if(breakOrder==2) return norm.x;
+if(breakOrder==3) return norm.y;
+return length(norm)*1.414;
+}
+void main(){
+vec2  uv     = acScreenNorm;
+float aspect = acScreenSize.x / acScreenSize.y;
+vec2  grid   = vec2(colCount, rowCount);
+float cols   = colCount;
+float rows   = rowCount;
+float cellW = 1.0 / cols;
+float cellH = 1.0 / rows;
+vec4 bg = vec4(0.0);
+vec4  bestColor = bg;
+float bestZ     = -1.0;
+float searchR = ceil(max(cols,rows) * 0.5);
+vec2  approxCell = uv * grid;
+float ix0 = max(floor(approxCell.x) - 3.0, 0.0);
+float ix1 = min(floor(approxCell.x) + 3.0, cols-1.0);
+float iy0 = max(floor(approxCell.y) - 3.0, 0.0);
+float iy1 = min(floor(approxCell.y) + 3.0, rows-1.0);
+for(float cy = 0.0; cy < 30.0; cy++){
+if(cy > rowCount-1.0) break;
+float iy = cy;
+for(float cx = 0.0; cx < 30.0; cx++){
+if(cx > colCount-1.0) break;
+float ix = cx;
+vec2 cellID = vec2(ix, iy);
+vec2 origCenter = (cellID + 0.5) / grid;
+float rnd     = hash2(cellID);
+float rndSpd  = 1.0 + (rnd - 0.5)*2.0*speedVar;
+float del     = tileDelay(cellID, grid) * delaySpread;
+float tileT   = clamp(
+(progress - del) / max(1.0 - del, 0.001),
+0.0, 1.0
+);
+float eased   = tileT * tileT * (3.0 - 2.0*tileT);
+float zPos    = eased * zDepth * rndSpd;
+float focalLen = 2.0;
+float scale    = focalLen / max(focalLen - zPos * 0.5, 0.001);
+vec2  parallaxDir = origCenter - 0.5;
+vec2  projCenter  = 0.5 + parallaxDir * scale;
+float halfW = cellW * 0.5 * scale;
+float halfH = cellH * 0.5 * scale;
+float gap = gapSize * 0.5;
+vec2  diff = uv - projCenter;
+float inW  = halfW - gap;
+float inH  = halfH - gap;
+if(abs(diff.x) <= inW && abs(diff.y) <= inH){
+if(zPos > bestZ){
+bestZ = zPos;
+vec2 localUV  = (uv - projCenter) / scale + origCenter;
+vec4 tileCol  = sampleTex(localUV);
+float fade    = 1.0 - eased * fadeOut;
+tileCol.a    *= clamp(fade, 0.0, 1.0);
+tileCol.rgb   = clamp(tileCol.rgb, 0.0, 1.0);
+bestColor     = tileCol;
+}
+}
+}
+}
+if(bestZ < 0.0){
+if(acShowGuides){
+vec2  gridUV   = fract(uv * vec2(colCount, rowCount));
+float gridLine = 1.0 - step(gapSize + 0.01, min(
+min(gridUV.x, 1.0 - gridUV.x),
+min(gridUV.y, 1.0 - gridUV.y)
+));
+gl_FragColor = vec4(1.0, 1.0, 1.0, gridLine * 0.5);
+} else {
+gl_FragColor = vec4(0.0);
+}
+} else {
+float a = bestColor.a;
+if(acShowGuides){
+vec2  cellID2  = floor(uv * vec2(colCount, rowCount));
+vec2  cellFr   = fract(uv * vec2(colCount, rowCount));
+float edge     = 1.0 - smoothstep(0.0, 0.06,
+min(min(cellFr.x, 1.0-cellFr.x),
+min(cellFr.y, 1.0-cellFr.y)));
+vec3  guideCol = mix(bestColor.rgb, vec3(0.0, 0.8, 1.0), edge * 0.6);
+gl_FragColor   = vec4(guideCol * a, a);
+} else {
+gl_FragColor = vec4(bestColor.rgb * a, a);
+}
+}
+}]]></shader>
+</effect>

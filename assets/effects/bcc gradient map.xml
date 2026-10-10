@@ -1,0 +1,261 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.bccgradientmap"
+name="BCC Gradient Map"
+desc="Professional gradient map with 5-point color stops, multiple luminance modes, blend controls, zone isolation, color shifting, and preserve options"
+category="color"
+tags="gradient,map,color,duotone,tritone,grade,stylize,bcc"
+thumb="thumb/bbccmap.webp">
+<params>
+<texture id="inputImg" srcType="content"/>
+<section text="GRADIENT COLORS"/>
+<color id="color1" label="Blacks Color" default="#000000" alpha="false"/>
+<color id="color2" label="Shadows Color" default="#1A0A30" alpha="false"/>
+<color id="color3" label="Midtones Color" default="#CC4400" alpha="false"/>
+<color id="color4" label="Highlights Color" default="#FFAA44" alpha="false"/>
+<color id="color5" label="Whites Color" default="#FFFFFF" alpha="false"/>
+<section text="GRADIENT STOPS"/>
+<spinner id="stop1" label="Blacks Stop" default="0.0" min="0.0" max="1.0" step="0.01" type="float"/>
+<spinner id="stop2" label="Shadows Stop" default="0.25" min="0.0" max="1.0" step="0.01" type="float"/>
+<spinner id="stop3" label="Midtones Stop" default="0.5" min="0.0" max="1.0" step="0.01" type="float"/>
+<spinner id="stop4" label="Highlights Stop" default="0.75" min="0.0" max="1.0" step="0.01" type="float"/>
+<spinner id="stop5" label="Whites Stop" default="1.0" min="0.0" max="1.0" step="0.01" type="float"/>
+<section text="LUMINANCE SOURCE"/>
+<selector id="lumMode" style="dropdown" default="1" label="Luminance Mode">
+<choice label="Rec.709" value="1"/>
+<choice label="Max RGB" value="2"/>
+<choice label="Average" value="3"/>
+<choice label="Perceptual" value="4"/>
+<choice label="Red" value="5"/>
+<choice label="Green" value="6"/>
+<choice label="Blue" value="7"/>
+<choice label="Desaturated" value="8"/>
+</selector>
+<section text="GRADIENT CURVE"/>
+<spinner id="gradGamma" label="Gradient Gamma" default="1.0" min="0.2" max="3.0" step="0.05" type="float"/>
+<spinner id="gradContrast" label="Gradient Contrast" default="0.0" min="-100.0" max="100.0" step="1.0" type="float"/>
+<spinner id="gradBrightness" label="Gradient Brightness" default="0.0" min="-100.0" max="100.0" step="1.0" type="float"/>
+<switch id="gradInvert" default="false" label="Invert Gradient"/>
+<switch id="gradReverse" default="false" label="Reverse Colors"/>
+<section text="BLEND"/>
+<spinner id="mapStrength" label="Map Strength" default="1.0" min="0.0" max="1.0" step="0.01" type="float"/>
+<selector id="blendMode" style="dropdown" default="1" label="Blend Mode">
+<choice label="Normal" value="1"/>
+<choice label="Multiply" value="2"/>
+<choice label="Screen" value="3"/>
+<choice label="Overlay" value="4"/>
+<choice label="Soft Light" value="5"/>
+<choice label="Color" value="6"/>
+<choice label="Luminosity" value="7"/>
+</selector>
+<section text="PRESERVE"/>
+<spinner id="preserveLum" label="Preserve Luminance" default="0.0" min="0.0" max="1.0" step="0.01" type="float"/>
+<spinner id="preserveSat" label="Preserve Saturation" default="0.0" min="0.0" max="1.0" step="0.01" type="float"/>
+<spinner id="preserveHue" label="Preserve Hue" default="0.0" min="0.0" max="1.0" step="0.01" type="float"/>
+<section text="COLOR SHIFT"/>
+<spinner id="hueShift" label="Hue Shift" default="0.0" min="-180.0" max="180.0" step="1.0" type="float"/>
+<spinner id="satAdjust" label="Saturation Adjust" default="0.0" min="-100.0" max="100.0" step="1.0" type="float"/>
+<spinner id="lumAdjust" label="Luminance Adjust" default="0.0" min="-100.0" max="100.0" step="1.0" type="float"/>
+<section text="ZONE ISOLATION"/>
+<spinner id="shadowsOnly" label="Shadows Strength" default="1.0" min="0.0" max="1.0" step="0.01" type="float"/>
+<spinner id="midtonesOnly" label="Midtones Strength" default="1.0" min="0.0" max="1.0" step="0.01" type="float"/>
+<spinner id="highlightsOnly" label="Highlights Strength" default="1.0" min="0.0" max="1.0" step="0.01" type="float"/>
+<section text="DUOTONE QUICK"/>
+<switch id="duotoneMode" default="false" label="Duotone Mode"/>
+<color id="duoShadow" label="Duo Shadow" default="#0A1628" alpha="false"/>
+<color id="duoHighlight" label="Duo Highlight" default="#FFD4A0" alpha="false"/>
+<section text="OUTPUT"/>
+<spinner id="globalMix" label="Global Mix" default="1.0" min="0.0" max="1.0" step="0.01" type="percent"/>
+</params>
+<passes>
+<pass/>
+</passes>
+<shader type="fragment" precision="medium"><![CDATA[#define EPS 0.00001
+#define PI 3.14159265359
+float lum709(vec3 c) {
+return dot(c, vec3(0.2126, 0.7152, 0.0722));
+}
+float getLum(vec3 c, float mode) {
+if (mode < 1.5) return dot(c, vec3(0.2126, 0.7152, 0.0722));
+if (mode < 2.5) return max(c.r, max(c.g, c.b));
+if (mode < 3.5) return (c.r + c.g + c.b) / 3.0;
+if (mode < 4.5) return pow(dot(pow(max(c, 0.0), vec3(2.2)), vec3(0.2126, 0.7152, 0.0722)), 1.0 / 2.2);
+if (mode < 5.5) return c.r;
+if (mode < 6.5) return c.g;
+if (mode < 7.5) return c.b;
+float mx = max(c.r, max(c.g, c.b));
+float mn = min(c.r, min(c.g, c.b));
+return (mx + mn) * 0.5;
+}
+vec3 rgb2hsl(vec3 c) {
+float mx = max(c.r, max(c.g, c.b));
+float mn = min(c.r, min(c.g, c.b));
+float l = (mx + mn) * 0.5;
+float d = mx - mn;
+float s = 0.0;
+float h = 0.0;
+if (d > EPS) {
+s = (l > 0.5) ? d / max(2.0 - mx - mn, EPS) : d / max(mx + mn, EPS);
+if (mx == c.r) { h = (c.g - c.b) / d + (c.g < c.b ? 6.0 : 0.0); }
+else if (mx == c.g) { h = (c.b - c.r) / d + 2.0; }
+else { h = (c.r - c.g) / d + 4.0; }
+h /= 6.0;
+}
+return vec3(h, s, l);
+}
+float h2r(float p, float q, float t) {
+if (t < 0.0) t += 1.0;
+if (t > 1.0) t -= 1.0;
+if (t < 1.0/6.0) return p + (q - p) * 6.0 * t;
+if (t < 0.5) return q;
+if (t < 2.0/3.0) return p + (q - p) * (2.0/3.0 - t) * 6.0;
+return p;
+}
+vec3 hsl2rgb(vec3 c) {
+if (c.y < EPS) return vec3(c.z);
+float q = (c.z < 0.5) ? c.z * (1.0 + c.y) : c.z + c.y - c.z * c.y;
+float p = 2.0 * c.z - q;
+return vec3(h2r(p,q,c.x+1.0/3.0), h2r(p,q,c.x), h2r(p,q,c.x-1.0/3.0));
+}
+vec3 sampleGradient(float t, vec3 c1, vec3 c2, vec3 c3, vec3 c4, vec3 c5,
+float s1, float s2, float s3, float s4, float s5) {
+if (t <= s1) return c1;
+if (t >= s5) return c5;
+if (t < s2) {
+float f = (t - s1) / max(s2 - s1, EPS);
+f = f * f * (3.0 - 2.0 * f);
+return mix(c1, c2, f);
+}
+if (t < s3) {
+float f = (t - s2) / max(s3 - s2, EPS);
+f = f * f * (3.0 - 2.0 * f);
+return mix(c2, c3, f);
+}
+if (t < s4) {
+float f = (t - s3) / max(s4 - s3, EPS);
+f = f * f * (3.0 - 2.0 * f);
+return mix(c3, c4, f);
+}
+float f = (t - s4) / max(s5 - s4, EPS);
+f = f * f * (3.0 - 2.0 * f);
+return mix(c4, c5, f);
+}
+vec3 blendColors(vec3 base, vec3 mapped, float mode) {
+if (mode < 1.5) {
+return mapped;
+}
+if (mode < 2.5) {
+return base * mapped;
+}
+if (mode < 3.5) {
+return 1.0 - (1.0 - base) * (1.0 - mapped);
+}
+if (mode < 4.5) {
+vec3 r;
+r.r = (base.r < 0.5) ? 2.0*base.r*mapped.r : 1.0-2.0*(1.0-base.r)*(1.0-mapped.r);
+r.g = (base.g < 0.5) ? 2.0*base.g*mapped.g : 1.0-2.0*(1.0-base.g)*(1.0-mapped.g);
+r.b = (base.b < 0.5) ? 2.0*base.b*mapped.b : 1.0-2.0*(1.0-base.b)*(1.0-mapped.b);
+return r;
+}
+if (mode < 5.5) {
+vec3 r;
+r.r = (mapped.r<0.5) ? 2.0*base.r*mapped.r+base.r*base.r*(1.0-2.0*mapped.r) : 2.0*base.r*(1.0-mapped.r)+sqrt(max(base.r,0.0))*(2.0*mapped.r-1.0);
+r.g = (mapped.g<0.5) ? 2.0*base.g*mapped.g+base.g*base.g*(1.0-2.0*mapped.g) : 2.0*base.g*(1.0-mapped.g)+sqrt(max(base.g,0.0))*(2.0*mapped.g-1.0);
+r.b = (mapped.b<0.5) ? 2.0*base.b*mapped.b+base.b*base.b*(1.0-2.0*mapped.b) : 2.0*base.b*(1.0-mapped.b)+sqrt(max(base.b,0.0))*(2.0*mapped.b-1.0);
+return r;
+}
+if (mode < 6.5) {
+vec3 mappedHSL = rgb2hsl(mapped);
+vec3 baseHSL = rgb2hsl(base);
+return hsl2rgb(vec3(mappedHSL.x, mappedHSL.y, baseHSL.z));
+}
+vec3 mappedHSL = rgb2hsl(mapped);
+vec3 baseHSL = rgb2hsl(base);
+return hsl2rgb(vec3(baseHSL.x, baseHSL.y, mappedHSL.z));
+}
+void main() {
+vec2 uv = acScreenNorm;
+vec4 original = texture2DCv(inputImg.texture, uv);
+vec3 rgb = max(original.rgb, 0.0);
+vec3 baseRGB = rgb;
+float lm = float(lumMode);
+float t = getLum(rgb, lm);
+if (abs(gradGamma - 1.0) > EPS) {
+t = pow(max(t, 0.0), 1.0 / max(gradGamma, EPS));
+}
+if (abs(gradContrast) > 0.5) {
+float gc = gradContrast / 100.0;
+t = clamp((t - 0.5) * (1.0 + gc) + 0.5, 0.0, 1.0);
+}
+if (abs(gradBrightness) > 0.5) {
+t = clamp(t + gradBrightness / 100.0 * 0.3, 0.0, 1.0);
+}
+if (gradInvert) {
+t = 1.0 - t;
+}
+vec3 c1 = color1.rgb;
+vec3 c2 = color2.rgb;
+vec3 c3 = color3.rgb;
+vec3 c4 = color4.rgb;
+vec3 c5 = color5.rgb;
+if (gradReverse) {
+vec3 tmp;
+tmp = c1; c1 = c5; c5 = tmp;
+tmp = c2; c2 = c4; c4 = tmp;
+}
+if (duotoneMode) {
+c1 = duoShadow.rgb;
+c2 = mix(duoShadow.rgb, duoHighlight.rgb, 0.25);
+c3 = mix(duoShadow.rgb, duoHighlight.rgb, 0.5);
+c4 = mix(duoShadow.rgb, duoHighlight.rgb, 0.75);
+c5 = duoHighlight.rgb;
+}
+vec3 mapped = sampleGradient(t, c1, c2, c3, c4, c5,
+stop1, stop2, stop3, stop4, stop5);
+float shadowMask = 1.0 - smoothstep(0.0, 0.4, t);
+float highlightMask = smoothstep(0.6, 1.0, t);
+float midtoneMask = 1.0 - shadowMask - highlightMask;
+midtoneMask = max(midtoneMask, 0.0);
+float zoneMask = shadowMask * shadowsOnly
++ midtoneMask * midtonesOnly
++ highlightMask * highlightsOnly;
+mapped = mix(rgb, mapped, zoneMask);
+mapped = mix(rgb, mapped, mapStrength);
+vec3 blended = blendColors(rgb, mapped, float(blendMode));
+if (preserveHue > EPS) {
+vec3 origHSL = rgb2hsl(rgb);
+vec3 blendHSL = rgb2hsl(max(blended, 0.0));
+blendHSL.x = mix(blendHSL.x, origHSL.x, preserveHue);
+blended = hsl2rgb(blendHSL);
+}
+if (preserveSat > EPS) {
+vec3 origHSL = rgb2hsl(rgb);
+vec3 blendHSL = rgb2hsl(max(blended, 0.0));
+blendHSL.y = mix(blendHSL.y, origHSL.y, preserveSat);
+blended = hsl2rgb(blendHSL);
+}
+if (preserveLum > EPS) {
+float origLum = lum709(rgb);
+float blendLum = lum709(blended);
+if (blendLum > EPS) {
+blended *= mix(1.0, origLum / blendLum, preserveLum);
+}
+}
+if (abs(hueShift) > 0.5 || abs(satAdjust) > 0.5 || abs(lumAdjust) > 0.5) {
+vec3 hsl = rgb2hsl(max(blended, 0.0));
+if (abs(hueShift) > 0.5) {
+hsl.x = fract(hsl.x + hueShift / 360.0);
+}
+if (abs(satAdjust) > 0.5) {
+hsl.y = clamp(hsl.y * (1.0 + satAdjust / 100.0), 0.0, 1.0);
+}
+if (abs(lumAdjust) > 0.5) {
+hsl.z = clamp(hsl.z + lumAdjust / 100.0 * 0.3, 0.0, 1.0);
+}
+blended = hsl2rgb(hsl);
+}
+vec3 fin = mix(baseRGB, blended, globalMix);
+fin = clamp(fin, 0.0, 1.0);
+gl_FragColor = vec4(fin, original.a);
+}]]></shader>
+<flag name="color"/>
+</effect>

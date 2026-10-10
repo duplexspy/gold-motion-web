@@ -1,0 +1,50 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.denoise_sharpen"
+name="Sharpen pro"
+desc="Bilateral denoise followed by unsharp mask. Port of Gemini's Shadertoy."
+category="color"
+tags="denoise,bilateral,sharpen,unsharp,detail"
+thumb="thumb/sharpenpro.webp">
+<params>
+<texture id="inputImg" srcType="content" />
+<section text="Denoise" />
+<spinner id="noiseStrength" default="0.15" min="0.01" max="100.0" step="0.005" label="Noise Reduction Strength" />
+<section text="Sharpen" />
+<spinner id="sharpenStrength" default="2.0" min="0.0" max="100.0" step="0.05" label="Sharpen Strength" />
+<section text="View" />
+<selector id="viewMode" default="2" style="radio" label="View">
+<choice label="Denoised" value="0" />
+<choice label="Original" value="1" />
+<choice label="Final" value="2" />
+</selector>
+<section text="Output" />
+<spinner id="alpha" default="1.0" min="0.0" max="1.0" step="0.01" label="Alpha" type="percent" />
+</params>
+<shader type="fragment" precision="high"><![CDATA[void main(){
+vec2 uv = acScreenNorm;
+vec2 texel = 1.0 / inputImg.size;
+vec3 centerColor = texture2DCv(inputImg.texture, uv).rgb;
+vec3 accum = vec3(0.0);
+float wsum = 0.0;
+for(int j=-2;j<=2;j++){
+for(int i=-2;i<=2;i++){
+vec2 off = vec2(float(i), float(j));
+vec3 nc = texture2DCv(inputImg.texture, uv + off * texel).rgb;
+float spatial = exp(-(off.x*off.x + off.y*off.y) / 8.0);
+float cd = length(centerColor - nc);
+float range = exp(-(cd*cd) / (2.0 * noiseStrength * noiseStrength + 1e-6));
+float w = spatial * range;
+accum += nc * w;
+wsum += w;
+}
+}
+vec3 denoised = accum / max(wsum, 1e-6);
+vec3 detail = centerColor - denoised;
+vec3 finalSharpened = centerColor + detail * sharpenStrength;
+vec3 outRGB = finalSharpened;
+if(int(viewMode)==0) outRGB = denoised;
+else if(int(viewMode)==1) outRGB = centerColor;
+float a = texture2DCv(inputImg.texture, uv).a * alpha;
+gl_FragColor = vec4(clamp(outRGB, 0.0, 1.0), 1.0) * a;
+}]]></shader>
+</effect>

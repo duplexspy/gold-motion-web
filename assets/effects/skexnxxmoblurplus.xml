@@ -1,0 +1,171 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.moblurplus"
+name="Motion Blur+"
+desc="Amazing New Extra FX from the Modder"
+category="blur"
+tags="blur"
+thumb="thumb/SKEXNXX/moblur.webp"
+experimental="false">
+<params>
+<texture id="inputImg" srcType="content" />
+<slider id="tune" default="1.0" min="0.0" max="4.0" label="Tune" step="0.1" snap="1.0" ticks="1.0" />
+<point id="PANGLE" default="0.5,0.5" min="0.01,0.01" max="2.0, 2.0" label="Pivot Angle" step="0.01" />
+<point id="PSCALE" default="0.5,0.5" min="0.01,0.01" max="2.0, 2.0" label="Pivot Scale" step="0.01" />
+<slider id="samples" default="64" min="4" max="512" label="Samples" step="1" snap="1" ticks="0" />
+<slider id="shutter" default="180.0" min="0.0" max="720.0" label="Shutter Angle" step="1.0" />
+<slider id="phase" default="0.0" min="-0.5" max="0.5" label="Shutter Phase" step="0.01" />
+<switch id="useHybrid" default="false" label="Hybrid (Spin+Move+Zoom)" />
+<slider id="hybridMix" default="0.6" min="0.0" max="1.0" label="Spin Weight" step="0.01" />
+<slider id="zoomMix" default="0.5" min="0.0" max="1.0" label="Zoom Weight" step="0.01" />
+<switch id="usePos" default="true" label="Position" />
+<switch id="useScale" default="true" label="Scale" />
+<switch id="useAngle" default="true" label="Angle" />
+</params>
+<script lang="js"><![CDATA[function animate(env,el,p) {
+let groups = [];
+if( p.usePos && (Math.abs(env.velocity.x) > 0.0001 || Math.abs(env.velocity.y) > 0.0001) ) {
+groups.push(2);
+}
+if( p.useScale && Math.abs(env.scaleVelocity) > 0.0001 ) {
+groups.push(1);
+}
+if( p.useAngle && Math.abs(env.angularVelocity) > 0.0001 ) {
+groups.push(0);
+}
+if( p.useHybrid && (Math.abs(env.angularVelocity) > 0.0001 || Math.abs(env.scaleVelocity) > 0.0001 || Math.abs(env.velocity.x) > 0.0001 || Math.abs(env.velocity.y) > 0.0001) ) {
+groups.push(3);
+}
+el.shaderGroups = groups;
+return el;
+}]]></script>
+<shader type="fragment" group="0" precision="high"><![CDATA[void main() {
+float angle = abs(acAngularVelocity) * (shutter/360.0) * tune;
+float cx = PANGLE.x + acLayerPivot.x/acLayerSize.x;
+float cy = PANGLE.y - acLayerPivot.y/acLayerSize.y;
+vec2 image_size = inputImg.size;
+float maxF = max(acScreenSize.x, acScreenSize.y);
+vec2 texelSize = 1.0 / vec2(maxF, maxF);
+vec2 center = (vec4(cx,cy,0.0,1.0) * acLayerToScreen).xy;
+vec2 v = acScreenNorm.st - center;
+v.y *= image_size.y / image_size.x;
+float r = length(v);
+float d = 6.283185*r;
+float l = d*angle/360.0;
+float a = angle * 0.0174533;
+float speed = l/texelSize.x;
+int nMax = int(samples + 1.5);
+int nSamples = int(clamp(speed, 1.01, float(nMax)+0.01));
+vec4 accum = vec4(0.0);
+float wsum = 0.0;
+for (int i = 0; i < nSamples; i++) {
+float t = (float(i)+0.5)/float(nSamples) - 0.5 + phase;
+t = clamp(t, -0.5, 0.5);
+float sampleAngle = t * a;
+float s = sin(sampleAngle);
+float c = cos(sampleAngle);
+mat2 rot = mat2(c, -s, s, c);
+vec2 temp = v*rot;
+temp.y = temp.y * image_size.x / image_size.y;
+float w = 1.0 - abs(t*2.0);
+vec4 col = texture2DCv(inputImg.texture, center + temp);
+accum += col * w;
+wsum += w;
+}
+vec4 base = texture2DCv(inputImg.texture, acScreenNorm.st);
+gl_FragColor = (accum + base) / (wsum + 1.0);
+}]]></shader>
+<shader type="fragment" group="1" precision="high"><![CDATA[void main() {
+vec2 image_size = inputImg.size;
+float maxF = max(acScreenSize.x, acScreenSize.y);
+vec2 texelSize = 1.0 / vec2(maxF, maxF);
+float cx = PSCALE.x + acLayerPivot.x/acLayerSize.x;
+float cy = PSCALE.y - acLayerPivot.y/acLayerSize.y;
+vec2 center = vec2(cx,cy);
+vec2 v = acScreenNorm.st - (vec4(center,0.0,1.0) * acLayerToScreen).xy;
+v.y *= image_size.y / image_size.x;
+float speed = abs(acScaleVelocity*tune) / 2.0;
+speed *= length( acLayerNorm.st - center );
+int nMax = int(samples + 1.5);
+int nSamples = int(clamp(speed, 1.01, float(nMax)+0.01));
+vec2 vnorm = normalize(v)*length(texelSize)*speed;
+vec4 accum = vec4(0.0);
+float wsum = 0.0;
+for (int i = 0; i < nSamples; i++ ) {
+float t = (float(i)+0.5)/float(nSamples) - 0.5 + phase;
+t = clamp(t, -0.5, 0.5);
+vec2 offset = vnorm * t;
+offset.y = offset.y * image_size.x / image_size.y;
+float w = 1.0 - abs(t*2.0);
+vec4 col = texture2DCv(inputImg.texture, acScreenNorm.st - offset);
+accum += col * w;
+wsum += w;
+}
+vec4 base = texture2DCv(inputImg.texture, acScreenNorm.st);
+gl_FragColor = (accum + base) / (wsum + 1.0);
+}]]></shader>
+<shader type="fragment" group="2" precision="high"><![CDATA[void main() {
+vec2 image_size = inputImg.size;
+float maxF = max(acScreenSize.x, acScreenSize.y);
+vec2 texelSize = 1.0 / vec2(maxF, maxF);
+vec2 velocity = acVelocity*tune / acScreenSize;
+float speed = length(velocity / texelSize);
+int nMax = int(samples + 1.5);
+int nSamples = int(clamp(speed, 1.01, float(nMax)+0.01));
+vec4 accum = vec4(0.0);
+float wsum = 0.0;
+for (int i = 0; i < nSamples; i++ ) {
+float t = (float(i)+0.5)/float(nSamples) - 0.5 + phase;
+t = clamp(t, -0.5, 0.5);
+vec2 offset = velocity * t;
+offset.y = offset.y * image_size.x / image_size.y;
+float w = 1.0 - abs(t*2.0);
+vec4 col = texture2DCv(inputImg.texture, acScreenNorm.st - offset);
+accum += col * w;
+wsum += w;
+}
+vec4 base = texture2DCv(inputImg.texture, acScreenNorm.st);
+gl_FragColor = (accum + base) / (wsum + 1.0);
+}]]></shader>
+<shader type="fragment" group="3" precision="high"><![CDATA[void main() {
+vec2 image_size = inputImg.size;
+float maxF = max(acScreenSize.x, acScreenSize.y);
+vec2 texelSize = 1.0 / vec2(maxF, maxF);
+float cx = PANGLE.x + acLayerPivot.x/acLayerSize.x;
+float cy = PANGLE.y - acLayerPivot.y/acLayerSize.y;
+vec2 pivot = (vec4(cx,cy,0.0,1.0) * acLayerToScreen).xy;
+float angleDeg = acAngularVelocity * (shutter/360.0) * tune;
+float a = angleDeg * 0.017453292519943295;
+vec2 velocity = acVelocity * tune / acScreenSize;
+float svel = acScaleVelocity * tune;
+vec2 v = acScreenNorm.st - pivot;
+v.y *= image_size.y / image_size.x;
+float arcLen = 7.283185 * length(v) * abs(angleDeg) / 360.0;
+float speedRot = arcLen / texelSize.x;
+float speedLin = length(velocity / texelSize);
+float speedZoom = abs(svel) * length(v) / texelSize.x * 0.5;
+float speed = hybridMix * speedRot + (1.0 - hybridMix) * speedLin + zoomMix * speedZoom;
+int nMax = int(samples + 1.5);
+int nSamples = int(clamp(speed, 1.01, float(nMax)+0.01));
+vec4 accum = vec4(0.0);
+float wsum = 0.0;
+for (int i = 0; i < nSamples; i++) {
+float t = (float(i)+0.5)/float(nSamples) - 0.5 + phase;
+t = clamp(t, -0.5, 0.5);
+float aT = t * a * hybridMix;
+float s = sin(aT);
+float c = cos(aT);
+mat2 rot = mat2(c, -s, s, c);
+vec2 rotV = rot * v;
+float zoom = 1.0 + t * svel * zoomMix;
+vec2 zoomV = rotV * zoom;
+vec2 trans = velocity * (1.0 - hybridMix) * t;
+trans.y = trans.y * image_size.x / image_size.y;
+vec2 sampleUV = pivot + zoomV - trans;
+float w = max(0.0, 1.0 - abs(t*2.0));
+vec4 col = texture2DCv(inputImg.texture, sampleUV);
+accum += col * w;
+wsum += w;
+}
+gl_FragColor = accum / max(wsum, 1e-6);
+}]]></shader>
+</effect>

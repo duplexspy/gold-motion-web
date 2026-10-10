@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect id="com.gmfx.effects.spotlight" name="GM Spotlight Stage" desc="Stage spotlight that brightens its pool of light and dims everything outside" category="lighting" tags="spotlight,stage,dark,focus,theater" overdraw="false" thumb="thumb/gm/gmspotlight.webp">
+<params>
+<texture id="inputImg" srcType="content"/>
+<section text="SPOT"/>
+<spinner id="spotX" default="50.0" min="0.0" max="100.0" step="0.5" label="Center X" type="percent"/>
+<spinner id="spotY" default="45.0" min="0.0" max="100.0" step="0.5" label="Center Y" type="percent"/>
+<spinner id="spotRadius" default="28.0" min="3.0" max="80.0" step="0.5" label="Radius" type="percent"/>
+<spinner id="spotSoft" default="0.55" min="0.05" max="1.0" step="0.01" label="Edge Softness" type="percent"/>
+<spinner id="spotBoost" default="0.55" min="0.0" max="2.0" step="0.01" label="In-Spot Boost" type="percent"/>
+<section text="STAGE"/>
+<spinner id="outerDim" default="0.72" min="0.0" max="1.0" step="0.01" label="Outer Dim" type="percent"/>
+<color id="dimTint" default="#0A0C1E" label="Dim Tint" alpha="false"/>
+<spinner id="dimTintAmt" default="0.4" min="0.0" max="1.0" step="0.01" label="Dim Tint Amount" type="percent"/>
+<switch id="stageFlicker" default="false" label="Lamp Flicker"/>
+</params>
+<shader type="fragment" precision="high"><![CDATA[void main(){
+vec2 uv = acScreenNorm;
+vec4 src = texture2DCv(inputImg.texture, uv);
+float aspect = max(getTexSize(inputImg.size).x / max(getTexSize(inputImg.size).y, 1.0), 0.5);
+vec2 c = vec2(spotX * 0.01, spotY * 0.01);
+float d = length((uv - c) * vec2(1.0, aspect));
+float rad = spotRadius * 0.01;
+float soft = max(spotSoft, 0.03) * rad;
+float spot = 1.0 - smoothstep(rad - soft, rad, d);
+if (stageFlicker) {
+spot *= 0.96 + 0.04 * sin(acTime * 47.0) * sin(acTime * 13.7);
+}
+vec3 inside = src.rgb * (1.0 + spotBoost * spot);
+vec3 outside = mix(src.rgb, dimTint.rgb * dot(src.rgb, vec3(0.333)) * 2.2, dimTintAmt);
+outside *= (1.0 - outerDim * (1.0 - spot));
+vec3 col = mix(outside, inside, spot);
+gl_FragColor = vec4(clamp(col, 0.0, 2.0) * src.a, src.a);
+}]]></shader>
+</effect>

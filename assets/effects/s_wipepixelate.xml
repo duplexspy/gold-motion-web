@@ -1,0 +1,67 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect
+id="com.alightcreative.effects.s_wipepixelate"
+name="S_WipePixelate"
+desc="Directional wipe transition whose edge dissolves into randomized pixel blocks. Sapphire-style WipePixelate."
+category="mask"
+tags="wipe,pixelate,transition,dissolve,sapphire,blocks"
+thumb="thumb/pixelwipe.webp"
+experimental="false">
+<params>
+<texture id="inputImg" srcType="content" />
+<section text="Wipe" />
+<selector id="transitionDir" style="dropdown" default="0" label="Transition Dir">
+<choice value="0" label="Wipe Off to Bg" />
+<choice value="1" label="Wipe On from Bg" />
+</selector>
+<selector id="background" style="dropdown" default="0" label="Background">
+<choice value="0" label="None (Transparent)" />
+<choice value="1" label="Black" />
+</selector>
+<slider  id="wipePercent" default="0.0" min="0.0"   max="1.0"   label="Wipe Percent"     type="percent" />
+<slider  id="edgeWidth"   default="0.25" min="0.0"  max="1.0"   label="Edge Width"       type="percent" />
+<spinner id="angle"       default="90.0" min="0.0"  max="360.0" step="1.0"  label="Angle" />
+<section text="Pixelate" />
+<spinner id="pixelFrequency" default="20.0" min="1.0"  max="200.0" step="1.0"   label="Pixel Frequency" />
+<spinner id="pixelRelWidth"  default="1.0"  min="0.1"  max="5.0"   step="0.05"  label="Pixel Rel Width" />
+<slider  id="chunky"         default="0.0"  min="0.0"  max="1.0"   label="Chunky" type="percent" />
+<spinner id="seed"           default="0.230" min="0.0" max="1.0"   step="0.001" label="Seed" />
+<slider id="showWipe" default="0.0" min="0.0" max="1.0" label="Show Wipe" type="percent" />
+</params>
+<shader type="fragment" precision="medium"><![CDATA[float hash(vec2 p) {
+return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+}
+void main() {
+vec2 uv = acScreenNorm;
+float ang = radians(angle);
+vec2 dir = vec2(cos(ang), sin(ang));
+float freq = pixelFrequency / (1.0 + chunky * 4.0);
+vec2 cells = vec2(freq / max(pixelRelWidth, 0.001), freq);
+vec2 block = floor(uv * cells);
+vec2 blockCenter = (block + 0.5) / cells;
+float rnd = hash(block + vec2(seed * 1000.0));
+float coord = dot(blockCenter - 0.5, dir) + 0.5;
+float ew = max(edgeWidth, 0.0001);
+float threshold = coord + (rnd - 0.5) * ew;
+float wiped = step(threshold, wipePercent);
+float reveal;
+if (transitionDir == 0) {
+reveal = 1.0 - wiped;
+} else {
+reveal = wiped;
+}
+if (showWipe > 0.5) {
+gl_FragColor = vec4(vec3(reveal), 1.0);
+return;
+}
+vec4 src = texture2DCv(inputImg.texture, uv);
+vec4 bg;
+if (background == 1) {
+bg = vec4(0.0, 0.0, 0.0, 1.0);
+} else {
+bg = vec4(0.0, 0.0, 0.0, 0.0);
+}
+vec4 outCol = mix(bg, src, reveal);
+gl_FragColor = outCol;
+}]]></shader>
+</effect>

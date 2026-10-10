@@ -1,0 +1,45 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect
+id="com.alightcreative.effects.rounded_edge_mask"
+name="Rounded Edge Mask"
+desc="Smooth rounded mask that follows the layer edges and moves with the layer"
+category="matte"
+tags="mask,round,smooth,edge,border,vignette,frame"
+thumb="thumb/roundmask.webp">
+<params>
+<texture id="inputImg" srcType="content" />
+<section text="Shape" />
+<spinner id="radius"    default="0.15" min="0.0"  max="1.0"   step="0.005" label="Corner Radius" />
+<spinner id="feather"   default="0.08" min="0.0"  max="1.0"   step="0.005" label="Feather (Softness)" />
+<spinner id="scaleX"    default="1.0"  min="0.01" max="2.0"   step="0.01"  label="Scale X" />
+<spinner id="scaleY"    default="1.0"  min="0.01" max="2.0"   step="0.01"  label="Scale Y" />
+<spinner id="offsetX"   default="0.0"  min="-1.0" max="1.0"   step="0.005" label="Offset X" />
+<spinner id="offsetY"   default="0.0"  min="-1.0" max="1.0"   step="0.005" label="Offset Y" />
+<section text="Options" />
+<switch  id="invert"    default="false" label="Invert Mask" />
+<spinner id="opacity"   default="1.0"  min="0.0"  max="1.0"   step="0.01"  label="Mask Opacity" />
+</params>
+<passes>
+<pass />
+</passes>
+<shader type="fragment" precision="high"><![CDATA[float sdRoundedBox(vec2 p, vec2 b, float r) {
+vec2 q = abs(p) - b + r;
+return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
+}
+void main() {
+vec2 uv = acLayerNorm;
+vec2 p = uv - 0.5 - vec2(offsetX, offsetY) * 0.5;
+float aspect = acLayerSize.x / acLayerSize.y;
+p.x *= aspect;
+vec2 halfExtents = vec2(0.5 * scaleX * aspect, 0.5 * scaleY);
+float r = radius * min(halfExtents.x, halfExtents.y);
+float dist = sdRoundedBox(p, halfExtents - r, r);
+float featherSize = feather * min(halfExtents.x, halfExtents.y) * 0.5;
+featherSize = max(featherSize, 0.0001);
+float mask = 1.0 - smoothstep(-featherSize, featherSize, dist);
+if (invert) mask = 1.0 - mask;
+mask *= opacity;
+vec4 col = texture2DCv(inputImg.texture, acScreenNorm);
+gl_FragColor = vec4(col.rgb * mask, col.a * mask);
+}]]></shader>
+</effect>

@@ -1,0 +1,16 @@
+<?xml
+version='1.0'
+encoding='UTF-8' ?>
+<effect id="com.alightcreative.effect.skexnxx"
+name="About Us"
+desc="Modded by PNKJ"
+category="other"
+thumb="thumb/aboutus_goldmotion.webp"
+tags="other">
+<params>
+<section text="MODDED BY PNKJ" />
+<section text="MODDED BY PNKJ" />
+<section text="TELEGRAM: @okpnkjj" />
+<tip text="THANKS FOR DOWNLOAD GOLD MOTION APK" />
+</params>
+</effect>

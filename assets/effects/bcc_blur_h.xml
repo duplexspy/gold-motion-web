@@ -1,0 +1,70 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<effect id="com.alightcreative.effects.bcc_blur_h" name="BCC Blur H" category="blur" tags="blur,triangle,gaussian" internal="true">
+<params>
+<texture id="inputImg" srcType="content" />
+<spinner id="xWidth" default="100.0" min="0.0" max="400.0" step="1.0" label="X Width" />
+<spinner id="glowRadius" default="30.0" min="0.0" max="300.0" step="0.1" label="Glow Radius" />
+<selector id="blurType" default="0" style="dropdown" label="Blur Type">
+<choice label="Triangle" value="0" />
+<choice label="Gaussian" value="1" />
+<choice label="Box" value="2" />
+</selector>
+<spinner id="triangleIterations" default="1" min="1" max="4" step="1" label="Triangle Blur Iterations" />
+<switch id="mirrorEdge" default="true" label="Mirror Edge" />
+</params>
+<shader type="fragment" precision="medium"><![CDATA[vec2 clampMirror(vec2 uv){
+if(mirrorEdge){
+uv = vec2(1.0,1.0) - abs(mod(uv,vec2(2.0,2.0)) - vec2(1.0,1.0));
+} else {
+uv = clamp(uv, vec2(0.0), vec2(1.0));
+}
+return uv;
+}
+vec4 sample(vec2 uv){ return texture2DCv(inputImg.texture, clampMirror(uv)); }
+vec4 blurBox(vec2 uv, float radiusPx){
+if(radiusPx<=0.0) return sample(uv);
+vec2 texel = 1.0/inputImg.size;
+int r = int(max(1.0,radiusPx));
+vec4 acc = vec4(0.0); float w = 0.0;
+for(int i=-64;i<=64;i++){
+if(i<-r) continue; if(i>r) break;
+vec2 offs = vec2(float(i)*texel.x,0.0);
+acc += sample(uv+offs);
+w += 1.0;
+}
+return acc/max(1.0,w);
+}
+float gaussW(float x, float sigma){ return exp(-(x*x)/(2.0*sigma*sigma)); }
+vec4 blurGaussian(vec2 uv, float radiusPx){
+if(radiusPx<=0.0) return sample(uv);
+vec2 texel = 1.0/inputImg.size;
+int r = int(max(1.0,radiusPx));
+float sigma = radiusPx*0.35;
+vec4 acc = vec4(0.0); float wsum = 0.0;
+for(int i=-64;i<=64;i++){
+if(i<-r) continue; if(i>r) break;
+float w = gaussW(float(i), sigma);
+acc += sample(uv + vec2(float(i)*texel.x,0.0)) * w;
+wsum += w;
+}
+return acc/max(0.0001,wsum);
+}
+vec4 blurTriangle(vec2 uv, float radiusPx, int iterations){
+vec4 c = sample(uv);
+vec4 outC = c;
+for(int it=0; it<4; it++){
+if(it>=iterations) break;
+outC = blurBox(uv, radiusPx);
+}
+return outC;
+}
+void main(){
+float radiusPx = xWidth * (glowRadius/100.0);
+vec2 uv = acScreenNorm;
+vec4 col;
+if(blurType==0){ col = blurTriangle(uv, radiusPx, int(triangleIterations)); }
+else if(blurType==1){ col = blurGaussian(uv, radiusPx); }
+else { col = blurBox(uv, radiusPx); }
+gl_FragColor = col;
+}]]></shader>
+</effect>

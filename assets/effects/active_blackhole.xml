@@ -1,0 +1,35 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<effect id="com.alightcreative.effects.activeblackhole" name="Black Hole circle" desc="Circular black hole with event horizon distortion" category="distort" tags="distort,blackhole,warp,circle,mask" thumb="thumb/blackhole.webp">
+<params>
+<texture id="inputImg" srcType="content" />
+<spinner id="size" default="0.25" min="0.0" max="10.5" step="0.01" label="Size" />
+<spinner id="distortion" default="0.15" min="0.0" max="10.0" step="0.01" label="Warp Strength" />
+<spinner id="feather" default="0.01" min="0.0" max="10.5" step="0.001" label="Feather" />
+<spinner id="centerX" default="0.5" min="0.0" max="10.0" step="0.01" label="Center X" />
+<spinner id="centerY" default="0.5" min="0.0" max="10.0" step="0.01" label="Center Y" />
+<switch id="invert" default="false" label="Invert Mask" />
+</params>
+<shader type="fragment" precision="high"><![CDATA[void main() {
+vec2 uv = acScreenNorm;
+vec2 center = vec2(centerX, centerY);
+vec2 p = uv - center;
+float aspect = acScreenSize.x / acScreenSize.y;
+p.x *= aspect;
+float dist = length(p);
+vec2 warpedUV = uv;
+if (dist > size) {
+float pull = size / dist;
+float offsetAmount = pow(pull, 2.0) * distortion;
+vec2 shift = normalize(p) * offsetAmount;
+shift.x /= aspect;
+vec2 dir = normalize(p);
+vec2 shiftVector = dir * offsetAmount;
+shiftVector.x /= aspect;
+warpedUV -= shiftVector;
+}
+vec4 tex = texture2DCv(inputImg.texture, warpedUV);
+float mask = smoothstep(size - feather, size + feather, dist);
+if (invert) mask = 1.0 - mask;
+gl_FragColor = tex * mask;
+}]]></shader>
+</effect>

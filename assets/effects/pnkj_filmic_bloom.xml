@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<effect id="com.goldmotion.effects.pnkj.filmicbloom" name="GM Filmic Bloom" desc="Thresholded cinematic bloom with a stable soft-knee highlight response." category="other" tags="glow,light,color" thumb="thumb/pnkj_filmic_bloom.webp" experimental="false">
+<params>
+<texture id="inputImg" srcType="content" />
+<spinner id="threshold" default="0.55" min="0.0" max="1.5" step="0.01" label="Threshold" />
+<spinner id="radius" default="8.0" min="0.5" max="32.0" step="0.5" label="Radius" />
+<spinner id="intensity" default="1.4" min="0.0" max="4.0" step="0.05" label="Intensity" />
+<spinner id="knee" default="0.25" min="0.01" max="1.0" step="0.01" label="Soft Knee" />
+</params>
+<shader type="fragment" precision="high"><![CDATA[const vec3 L = vec3(0.2126,0.7152,0.0722);
+vec3 bright(vec4 c){ float y=dot(c.rgb,L); float b=max(y-threshold,0.0)+smoothstep(threshold-knee,threshold+knee,y)*knee; return c.rgb*(b/max(y,0.0001)); }
+void main(){ vec2 uv=acScreenNorm; vec2 p=radius/max(inputImg.size,vec2(1.0)); vec4 src=texture2DCv(inputImg.texture,uv); vec3 b=bright(src)*0.20;
+b+=(bright(texture2DCv(inputImg.texture,uv+vec2(p.x,0.0)))+bright(texture2DCv(inputImg.texture,uv-vec2(p.x,0.0))))*0.12;
+b+=(bright(texture2DCv(inputImg.texture,uv+vec2(0.0,p.y)))+bright(texture2DCv(inputImg.texture,uv-vec2(0.0,p.y))))*0.12;
+b+=(bright(texture2DCv(inputImg.texture,uv+p))+bright(texture2DCv(inputImg.texture,uv-p))+bright(texture2DCv(inputImg.texture,uv+vec2(p.x,-p.y)))+bright(texture2DCv(inputImg.texture,uv+vec2(-p.x,p.y))))*0.08;
+gl_FragColor=vec4(src.rgb+b*intensity,src.a);
+}]]></shader>
+</effect>

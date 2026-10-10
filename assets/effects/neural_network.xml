@@ -1,0 +1,89 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect
+id="com.alightcreative.effects.neural_network"
+name="Neural Network"
+desc="A procedural web of lines simulating a neural network"
+category="stylize"
+tags="neural,network,lines,abstract,shadertoy"
+thumb="thumb/neuralnetwork.webp"
+experimental="false">
+<params>
+<texture id="inputImg" srcType="content" />
+<section text="Animation" />
+<point id="center" default="0.5,0.5" label="Center Point" />
+<spinner id="speed" default="1.0" min="0.0" max="5.0" step="0.01" label="Speed" />
+<spinner id="complexity" default="100.0" min="10.0" max="500.0" step="1.0" label="Complexity" />
+<section text="Appearance" />
+<color id="lineColor" default="#FF9999FF" label="Line Color" />
+<spinner id="intensity" default="1.0" min="0.1" max="5.0" step="0.1" label="Intensity" />
+<slider id="softness" default="0.02" min="0.001" max="0.1" label="Line Softness" />
+<section text="Rendering" />
+<switch id="followLayer" default="true" label="Follow Layer" />
+<section text="Mixing" />
+<slider id="blend" default="1.0" min="0.0" max="1.0" label="Blend" type="percent" />
+</params>
+<passes>
+<pass />
+</passes>
+<shader type="fragment" precision="high"><![CDATA[float dfLine(vec2 start, vec2 end, vec2 uv) {
+vec2 line = end - start;
+float frac = dot(uv - start, line) / dot(line, line);
+return distance(start + line * clamp(frac, 0.0, 1.0), uv);
+}
+float hash(vec2 p) {
+return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+float map(vec2 uv, vec2 mouse, float t, float time, float iterCount) {
+float col = 0.0;
+vec2 end = vec2(0.3, 0.3);
+vec2 p = mouse;
+vec2 p1 = end;
+vec2 oldP = p;
+vec2 oldP1 = p1;
+for(int i = 0; i < 64; i++) {
+if(float(i) >= iterCount) break;
+float fi = float(i);
+float p1Angle = atan(p.y - p1.y, p.x - p1.x);
+float pAngle = atan(p1.y - p.y, p1.x - p.x);
+p1Angle += (hash(p1 + fi + time * t) - 0.5) * 2.0;
+pAngle += (hash(p + fi + time * t) - 0.5) * 2.0;
+p += vec2(cos(pAngle), sin(pAngle)) / max(hash(p * p1 * time * fi + t) * 100.0, 60.0);
+p1 += vec2(cos(p1Angle), sin(p1Angle)) / max(hash(p * p1 * time * fi * 43.324 * t) * 100.0, 60.0);
+col += (1.0 - smoothstep(dfLine(p, oldP, uv), -softness * 0.5, softness)) * max(hash(p * fi * time + t * t) * 2.0, 0.3) / t;
+col += (1.0 - smoothstep(dfLine(p1, oldP1, uv), -softness * 0.5, softness)) * max(hash(p1 * fi * time / t) * 2.0, 0.3) / t;
+if (distance(p, p1) < 0.05) {
+col += 1.0 - smoothstep(dfLine(p, p1, uv), -softness * 0.5, softness);
+break;
+}
+oldP = p;
+oldP1 = p1;
+}
+return col;
+}
+vec4 tanh_approx(vec4 x) {
+vec4 e = exp(2.0 * x);
+return (e - 1.0) / (e + 1.0);
+}
+void main() {
+vec2 luv = acLayerNorm.xy;
+vec2 suv = acScreenNorm.xy;
+vec2 uv;
+vec2 aspect;
+if(followLayer) {
+uv = luv;
+aspect = vec2(acLayerSize.x / acLayerSize.y, 1.0);
+} else {
+uv = suv;
+aspect = vec2(acScreenSize.x / acScreenSize.y, 1.0);
+}
+uv = (uv * 2.0 - 1.0) * aspect;
+vec2 mouse = (center * 2.0 - 1.0) * aspect;
+float time = acTime * speed;
+float v = map(uv, mouse, 1.0, time, complexity) + map(uv, mouse, 3.0, time, complexity);
+vec4 effectCol = tanh_approx(vec4(v * intensity) * lineColor);
+effectCol.a = clamp(v * intensity, 0.0, 1.0);
+vec4 base = texture2DCv(inputImg.texture, suv);
+effectCol.a *= base.a;
+gl_FragColor = mix(base, effectCol, blend * effectCol.a);
+}]]></shader>
+</effect>

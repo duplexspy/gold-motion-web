@@ -1,0 +1,385 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.sshakeultra"
+name="S_Shake Ultra"
+desc="Nuclear-grade camera shake - 4-octave noise, 5 shake modes, frequency bands, shake decay/ramp, per-channel RGB split, X/Y/Z/Tilt with random+wave, organic handheld simulation, true sub-frame motion blur"
+category="transform"
+tags="shake,camera,transform,impact,handheld,earthquake,whip,manga,anime,motionblur"
+thumb="thumb/ultrashake.webp">
+<params>
+<texture id="inputImg" srcType="content"/>
+<section text="MASTER"/>
+<spinner id="amplitude" label="Amplitude" default="10.0" min="0.0" max="50.0" step="0.1" type="float"/>
+<spinner id="frequency" label="Frequency" default="8.0" min="0.1" max="40.0" step="0.1" type="float"/>
+<spinner id="phase" label="Phase" default="0.0" min="-10.0" max="10.0" step="0.01" type="float"/>
+<spinner id="globalAngle" label="Global Angle" default="0.0" min="-360.0" max="360.0" step="1.0" type="float"/>
+<spinner id="seed" label="Seed" default="0.0" min="0.0" max="100.0" step="1.0" type="float"/>
+<spinner id="smoothness" label="Smoothness" default="0.4" min="0.0" max="1.0" step="0.01" type="float"/>
+<section text="SHAKE MODE"/>
+<selector id="shakeMode" style="dropdown" default="1" label="Shake Mode">
+<choice label="Normal" value="1"/>
+<choice label="Handheld" value="2"/>
+<choice label="Earthquake" value="3"/>
+<choice label="Whip" value="4"/>
+<choice label="Bounce" value="5"/>
+</selector>
+<spinner id="modeIntensity" label="Mode Intensity" default="1.0" min="0.0" max="3.0" step="0.05" type="float"/>
+<section text="SHAKE ENVELOPE"/>
+<spinner id="decayAmount" label="Decay Amount" default="0.0" min="0.0" max="1.0" step="0.01" type="float"/>
+<spinner id="decaySpeed" label="Decay Speed" default="2.0" min="0.5" max="10.0" step="0.1" type="float"/>
+<spinner id="rampAmount" label="Ramp Amount" default="0.0" min="0.0" max="1.0" step="0.01" type="float"/>
+<spinner id="rampSpeed" label="Ramp Speed" default="2.0" min="0.5" max="10.0" step="0.1" type="float"/>
+<section text="FREQUENCY BANDS"/>
+<spinner id="lowFreqAmp" label="Low Freq Amplitude" default="1.0" min="0.0" max="3.0" step="0.05" type="float"/>
+<spinner id="midFreqAmp" label="Mid Freq Amplitude" default="1.0" min="0.0" max="3.0" step="0.05" type="float"/>
+<spinner id="highFreqAmp" label="High Freq Amplitude" default="1.0" min="0.0" max="3.0" step="0.05" type="float"/>
+<section text="X SHAKE"/>
+<spinner id="xRandAmp" label="X Random Amp" default="0.5" min="0.0" max="2.0" step="0.01" type="float"/>
+<spinner id="xRandFreq" label="X Random Freq" default="1.0" min="0.0" max="5.0" step="0.1" type="float"/>
+<spinner id="xWaveAmp" label="X Wave Amp" default="0.0" min="0.0" max="2.0" step="0.01" type="float"/>
+<spinner id="xWaveFreq" label="X Wave Freq" default="0.5" min="0.0" max="5.0" step="0.1" type="float"/>
+<spinner id="xPhase" label="X Phase" default="0.0" min="-10.0" max="10.0" step="0.1" type="float"/>
+<section text="Y SHAKE"/>
+<spinner id="yRandAmp" label="Y Random Amp" default="0.3" min="0.0" max="2.0" step="0.01" type="float"/>
+<spinner id="yRandFreq" label="Y Random Freq" default="1.0" min="0.0" max="5.0" step="0.1" type="float"/>
+<spinner id="yWaveAmp" label="Y Wave Amp" default="0.0" min="0.0" max="2.0" step="0.01" type="float"/>
+<spinner id="yWaveFreq" label="Y Wave Freq" default="0.5" min="0.0" max="5.0" step="0.1" type="float"/>
+<spinner id="yPhase" label="Y Phase" default="0.0" min="-10.0" max="10.0" step="0.1" type="float"/>
+<section text="Z SHAKE"/>
+<spinner id="zRandAmp" label="Z Random Amp" default="0.05" min="0.0" max="0.5" step="0.01" type="float"/>
+<spinner id="zRandFreq" label="Z Random Freq" default="1.0" min="0.0" max="5.0" step="0.1" type="float"/>
+<spinner id="zWaveAmp" label="Z Wave Amp" default="0.0" min="0.0" max="0.5" step="0.01" type="float"/>
+<spinner id="zWaveFreq" label="Z Wave Freq" default="0.5" min="0.0" max="5.0" step="0.1" type="float"/>
+<spinner id="zPhase" label="Z Phase" default="0.0" min="-10.0" max="10.0" step="0.1" type="float"/>
+<section text="TILT SHAKE"/>
+<spinner id="tiltRandAmp" label="Tilt Random Amp" default="2.0" min="0.0" max="30.0" step="0.1" type="float"/>
+<spinner id="tiltRandFreq" label="Tilt Random Freq" default="1.0" min="0.0" max="5.0" step="0.1" type="float"/>
+<spinner id="tiltWaveAmp" label="Tilt Wave Amp" default="0.0" min="0.0" max="30.0" step="0.1" type="float"/>
+<spinner id="tiltWaveFreq" label="Tilt Wave Freq" default="0.5" min="0.0" max="5.0" step="0.1" type="float"/>
+<spinner id="tiltPhase" label="Tilt Phase" default="0.0" min="-10.0" max="10.0" step="0.1" type="float"/>
+<section text="RGB SEPARATION"/>
+<spinner id="redAmp" label="Red Amplitude" default="1.0" min="0.0" max="3.0" step="0.05" type="float"/>
+<spinner id="greenAmp" label="Green Amplitude" default="1.0" min="0.0" max="3.0" step="0.05" type="float"/>
+<spinner id="blueAmp" label="Blue Amplitude" default="1.0" min="0.0" max="3.0" step="0.05" type="float"/>
+<spinner id="redPhase" label="Red Phase" default="0.0" min="-5.0" max="5.0" step="0.05" type="float"/>
+<spinner id="greenPhase" label="Green Phase" default="0.0" min="-5.0" max="5.0" step="0.05" type="float"/>
+<spinner id="bluePhase" label="Blue Phase" default="0.0" min="-5.0" max="5.0" step="0.05" type="float"/>
+<spinner id="rgbRandomness" label="RGB Randomness" default="0.0" min="0.0" max="1.0" step="0.01" type="float"/>
+<spinner id="rgbFrequency" label="RGB Frequency" default="2.0" min="0.1" max="10.0" step="0.1" type="float"/>
+<section text="MOTION BLUR"/>
+<switch id="mbEnable" default="true" label="Motion Blur"/>
+<spinner id="mbShutter" label="Shutter (sec)" default="0.030" min="0.0" max="0.25" step="0.001" type="float"/>
+<spinner id="mbSamples" label="Shutter Samples" default="12" min="2" max="24" step="1" type="integer"/>
+<selector id="mbShape" style="dropdown" default="2" label="Shutter Shape">
+<choice label="Box" value="0"/>
+<choice label="Triangle" value="1"/>
+<choice label="Cosine" value="2"/>
+<choice label="Gaussian" value="3"/>
+</selector>
+<spinner id="mbBias" label="Shutter Bias" default="0.0" min="-1.0" max="1.0" step="0.01" type="float"/>
+<switch id="mbDither" default="true" label="Dither Taps"/>
+<spinner id="mbMix" label="Blur Mix" default="1.0" min="0.0" max="1.0" step="0.01" type="percent"/>
+<section text="EDGE"/>
+<selector id="edgeMode" style="dropdown" default="3" label="Edge Mode">
+<choice label="Black" value="1"/>
+<choice label="Tile" value="2"/>
+<choice label="Reflect" value="3"/>
+</selector>
+<section text="OUTPUT"/>
+<spinner id="globalMix" label="Global Mix" default="1.0" min="0.0" max="1.0" step="0.01" type="percent"/>
+<section text="modded by saikuuxpp" />
+</params>
+<passes>
+<pass/>
+</passes>
+<shader type="fragment" precision="high"><![CDATA[#define EPS 0.00001
+#define PI 3.14159265359
+#define MBMAX 24
+
+// The shake geometry is anchored to the LAYER, not the frame. The original
+// pivoted tilt/zoom on vec2(0.5) in screen space, so a layer sitting away from
+// the middle of the frame swung through a huge arc instead of shaking in place.
+// The edge test is layer-relative too: screen-normal 0..1 is the whole frame,
+// so the "Black" edge mode could never fire and the layer never frayed.
+vec2 lpToScreen(vec2 v){ return (vec4(v, 0.0, 1.0) * acLayerToScreen).xy; }
+
+float hash(float n) {
+return fract(sin(n) * 43758.5453123);
+}
+float hash21(vec2 p) {
+return fract(sin(dot(p, vec2(41.317, 289.113))) * 43758.5453123);
+}
+float catmullRom(float t, float s) {
+float i = floor(t);
+float f = fract(t);
+float a = hash(i - 1.0 + s);
+float b = hash(i + s);
+float c = hash(i + 1.0 + s);
+float d = hash(i + 2.0 + s);
+float f2 = f * f;
+float f3 = f2 * f;
+float cr0 = -0.5*a + 1.5*b - 1.5*c + 0.5*d;
+float cr1 = a - 2.5*b + 2.0*c - 0.5*d;
+float cr2 = -0.5*a + 0.5*c;
+float cr3 = b;
+return cr0*f3 + cr1*f2 + cr2*f + cr3;
+}
+float bandedNoise(float t, float s, float sm, float lowAmp, float midAmp, float highAmp) {
+float n = 0.0;
+float low = catmullRom(t * 0.7, s) * 2.0 - 1.0;
+float mid = catmullRom(t * 2.1, s + 50.0) * 2.0 - 1.0;
+float high1 = catmullRom(t * 5.3, s + 100.0) * 2.0 - 1.0;
+float high2 = catmullRom(t * 11.7, s + 150.0) * 2.0 - 1.0;
+float highBlend = mix(high1, high2, 0.5) * mix(0.3, 0.15, sm);
+n = low * lowAmp * 1.0
++ mid * midAmp * mix(0.5, 0.3, sm)
++ highBlend * highAmp;
+return n;
+}
+float getRandomShake(float time, float freq, float ph, float seedOff, float sm) {
+float t = (time + ph) * freq;
+float s = seed + seedOff;
+return bandedNoise(t, s, sm, lowFreqAmp, midFreqAmp, highFreqAmp);
+}
+float getWaveShake(float time, float freq, float ph) {
+return sin((time + ph) * freq * 2.0 * PI);
+}
+float getEnvelope(float time) {
+float env = 1.0;
+if (decayAmount > EPS) {
+float decay = exp(-time * decaySpeed);
+env *= mix(1.0, decay, decayAmount);
+}
+if (rampAmount > EPS) {
+float ramp = 1.0 - exp(-time * rampSpeed);
+env *= mix(1.0, ramp, rampAmount);
+}
+return clamp(env, 0.0, 1.0);
+}
+float applyMode(float value, float time, float seedOff) {
+float md = float(shakeMode);
+if (md < 1.5) {
+return value;
+}
+if (md < 2.5) {
+float drift = catmullRom(time * 0.3, seed + seedOff + 700.0) * 2.0 - 1.0;
+float micro = catmullRom(time * 8.0, seed + seedOff + 800.0) * 2.0 - 1.0;
+float breathe = sin(time * 0.8 * PI) * 0.1;
+return value * 0.6 + (drift * 0.3 + micro * 0.08 + breathe) * modeIntensity * amplitude * 0.01;
+}
+if (md < 3.5) {
+float rumble = catmullRom(time * 1.5, seed + seedOff + 900.0) * 2.0 - 1.0;
+float spike = catmullRom(time * 12.0, seed + seedOff + 950.0) * 2.0 - 1.0;
+spike = spike * spike * sign(spike);
+return value * (1.0 + modeIntensity * 0.5) + (rumble * 0.4 + spike * 0.15) * modeIntensity * amplitude * 0.01;
+}
+if (md < 4.5) {
+float whipBase = sin(time * frequency * PI * 2.0);
+float whipSnap = pow(abs(whipBase), 3.0) * sign(whipBase);
+float whipNoise = catmullRom(time * 6.0, seed + seedOff + 1000.0) * 2.0 - 1.0;
+return whipSnap * modeIntensity * amplitude * 0.015 + whipNoise * modeIntensity * 0.003 * amplitude;
+}
+if (md < 5.5) {
+float bounceT = time * frequency * 1.5;
+float bounce = abs(sin(bounceT * PI)) * exp(-bounceT * 0.3);
+float bounceNoise = catmullRom(time * 4.0, seed + seedOff + 1100.0) * 2.0 - 1.0;
+float dir = (mod(floor(bounceT), 2.0) == 0.0) ? 1.0 : -1.0;
+return (bounce * dir * modeIntensity + bounceNoise * 0.1 * modeIntensity) * amplitude * 0.01;
+}
+return value;
+}
+float getShakeAxis(float time, float rAmp, float rFreq,
+float wAmp, float wFreq, float ph, float seedOff) {
+float result = 0.0;
+if (rAmp > EPS) {
+float rnd = getRandomShake(time, frequency * rFreq, ph + phase, seedOff, smoothness);
+result += rnd * rAmp;
+}
+if (wAmp > EPS) {
+float wav = getWaveShake(time, wFreq, ph + phase);
+result += wav * wAmp;
+}
+result *= amplitude * 0.01;
+result = applyMode(result, time, seedOff);
+return result;
+}
+vec2 applyEdge(vec2 uv, float mode) {
+if (mode < 1.5) {
+return uv;
+} else if (mode < 2.5) {
+return fract(uv);
+} else {
+vec2 r = uv;
+r.x = (mod(floor(r.x), 2.0) == 0.0) ? fract(r.x) : 1.0 - fract(r.x);
+r.y = (mod(floor(r.y), 2.0) == 0.0) ? fract(r.y) : 1.0 - fract(r.y);
+return r;
+}
+}
+vec2 computeShakeUV(vec2 base, vec2 piv, float time, float chAmp, float chPhase,
+float rgbRX, float rgbRY, float rgbRZ, float rgbRT) {
+float t = time + chPhase * 0.1;
+float env = getEnvelope(t);
+float sX = getShakeAxis(t, xRandAmp, xRandFreq, xWaveAmp, xWaveFreq, xPhase, 0.0);
+float sY = getShakeAxis(t, yRandAmp, yRandFreq, yWaveAmp, yWaveFreq, yPhase, 100.0);
+float sZ = getShakeAxis(t, zRandAmp, zRandFreq, zWaveAmp, zWaveFreq, zPhase, 200.0);
+float sT = getShakeAxis(t, tiltRandAmp, tiltRandFreq, tiltWaveAmp, tiltWaveFreq, tiltPhase, 300.0);
+sX += rgbRX;
+sY += rgbRY;
+sZ += rgbRZ;
+sT += rgbRT;
+sX *= chAmp * env;
+sY *= chAmp * env;
+sZ *= chAmp * env;
+sT *= chAmp * env;
+float angRad = globalAngle * PI / 180.0;
+float cosA = cos(angRad);
+float sinA = sin(angRad);
+float rX = sX * cosA - sY * sinA;
+float rY = sX * sinA + sY * cosA;
+sX = rX;
+sY = rY;
+vec2 result = base - piv;
+float tiltRad = sT * PI / 180.0;
+float cs = cos(tiltRad);
+float sn = sin(tiltRad);
+result = vec2(result.x*cs - result.y*sn, result.x*sn + result.y*cs);
+float zm = 1.0 / max(1.0 + sZ, 0.1);
+result *= zm;
+result += piv;
+result.x += sX;
+result.y += sY;
+return result;
+}
+vec2 toLayerUv(vec2 shaken, vec2 lo, vec2 hi) {
+return (shaken - lo) / max(hi - lo, vec2(1e-5));
+}
+// One temporal tap. The shake is evaluated at the sub-frame time tt, so the
+// trail follows the path the shake actually took. A fixed directional smear
+// would ignore the fact that this shake reverses direction several times
+// inside a single frame, which is exactly what produced the stutter.
+vec4 tapCol(vec2 base, vec2 piv, vec2 lo, vec2 hi, float em, float tt,
+float chAmp, float chPhase, float rX, float rY, float rZ, float rT,
+out float outside) {
+vec2 sh = computeShakeUV(base, piv, tt, chAmp, chPhase, rX, rY, rZ, rT);
+vec2 q = toLayerUv(sh, lo, hi);
+float o = 1.0;
+if (em < 1.5) {
+o = (q.x < 0.0 || q.x > 1.0 || q.y < 0.0 || q.y > 1.0) ? 0.0 : 1.0;
+}
+q = clamp(applyEdge(q, em), 0.0, 1.0);
+outside = o;
+return texture2DCv(inputImg.texture, lpToScreen(q));
+}
+float mbWeight(float u) {
+float x = abs(u * 2.0 - 1.0);
+if (mbShape <= 0) return 1.0;
+if (mbShape <= 1) return 1.0 - x;
+if (mbShape <= 2) return max(cos((u - 0.5) * PI), 0.0);
+return exp(-0.5 * x * x / 0.09);
+}
+void main() {
+vec2 lp = acLayerNorm;
+vec2 base = lpToScreen(lp);
+vec2 piv = lpToScreen(vec2(0.5));
+vec2 c00 = lpToScreen(vec2(0.0, 0.0));
+vec2 c11 = lpToScreen(vec2(1.0, 1.0));
+vec2 lo = min(c00, c11);
+vec2 hi = max(c00, c11);
+float t = acTime;
+float em = float(edgeMode);
+float rgbRXR=0.0; float rgbRYR=0.0; float rgbRZR=0.0; float rgbRTR=0.0;
+float rgbRXG=0.0; float rgbRYG=0.0; float rgbRZG=0.0; float rgbRTG=0.0;
+float rgbRXB=0.0; float rgbRYB=0.0; float rgbRZB=0.0; float rgbRTB=0.0;
+if (rgbRandomness > EPS) {
+float rt = t * rgbFrequency;
+float rScale = rgbRandomness * amplitude * 0.005;
+rgbRXR = getRandomShake(rt,1.0,0.0,400.0,smoothness) * rScale * xRandAmp;
+rgbRYR = getRandomShake(rt,1.0,0.0,410.0,smoothness) * rScale * yRandAmp;
+rgbRZR = getRandomShake(rt,1.0,0.0,420.0,smoothness) * rScale * zRandAmp * 10.0;
+rgbRTR = getRandomShake(rt,1.0,0.0,430.0,smoothness) * rScale * tiltRandAmp * 10.0;
+rgbRXG = getRandomShake(rt,1.0,0.0,500.0,smoothness) * rScale * xRandAmp;
+rgbRYG = getRandomShake(rt,1.0,0.0,510.0,smoothness) * rScale * yRandAmp;
+rgbRZG = getRandomShake(rt,1.0,0.0,520.0,smoothness) * rScale * zRandAmp * 10.0;
+rgbRTG = getRandomShake(rt,1.0,0.0,530.0,smoothness) * rScale * tiltRandAmp * 10.0;
+rgbRXB = getRandomShake(rt,1.0,0.0,600.0,smoothness) * rScale * xRandAmp;
+rgbRYB = getRandomShake(rt,1.0,0.0,610.0,smoothness) * rScale * yRandAmp;
+rgbRZB = getRandomShake(rt,1.0,0.0,620.0,smoothness) * rScale * zRandAmp * 10.0;
+rgbRTB = getRandomShake(rt,1.0,0.0,630.0,smoothness) * rScale * tiltRandAmp * 10.0;
+}
+bool needsSep = (abs(redAmp-1.0)>EPS || abs(greenAmp-1.0)>EPS || abs(blueAmp-1.0)>EPS ||
+abs(redPhase)>EPS || abs(greenPhase)>EPS || abs(bluePhase)>EPS ||
+rgbRandomness>EPS);
+vec4 original = texture2DCv(inputImg.texture, base);
+float n = 1.0;
+float span = 0.0;
+if (mbEnable) {
+n = clamp(floor(mbSamples + 0.5), 1.0, float(MBMAX));
+span = max(mbShutter, 0.0);
+}
+float bias = clamp(mbBias, -1.0, 1.0);
+vec2 dj = base * 733.0;
+vec3 fin;
+float finAlpha;
+float wsum = 0.0;
+if (needsSep) {
+float sr = 0.0; float sg = 0.0; float sb = 0.0;
+float ar = 0.0; float ag = 0.0; float ab = 0.0;
+for (int i = 0; i < MBMAX; i++) {
+if (float(i) >= n) break;
+float u = (float(i) + 0.5) / n;
+if (mbDither) u = clamp(u + (hash21(dj + vec2(float(i) * 7.31, float(i) * 3.17)) - 0.5) / n, 0.0, 1.0);
+float tt = t - span * u + span * bias;
+float w = mbWeight(u);
+float o;
+vec4 k1 = tapCol(base, piv, lo, hi, em, tt, redAmp, redPhase, rgbRXR, rgbRYR, rgbRZR, rgbRTR, o);
+sr += k1.r * w * o; ar += k1.a * w * o;
+vec4 k2 = tapCol(base, piv, lo, hi, em, tt, greenAmp, greenPhase, rgbRXG, rgbRYG, rgbRZG, rgbRTG, o);
+sg += k2.g * w * o; ag += k2.a * w * o;
+vec4 k3 = tapCol(base, piv, lo, hi, em, tt, blueAmp, bluePhase, rgbRXB, rgbRYB, rgbRZB, rgbRTB, o);
+sb += k3.b * w * o; ab += k3.a * w * o;
+wsum += w;
+}
+fin = vec3(sr, sg, sb) / max(wsum, 1e-4);
+finAlpha = (ar + ag + ab) / max(3.0 * wsum, 1e-4);
+} else {
+vec4 acc = vec4(0.0);
+for (int i = 0; i < MBMAX; i++) {
+if (float(i) >= n) break;
+float u = (float(i) + 0.5) / n;
+if (mbDither) u = clamp(u + (hash21(dj + vec2(float(i) * 7.31, float(i) * 3.17)) - 0.5) / n, 0.0, 1.0);
+float tt = t - span * u + span * bias;
+float w = mbWeight(u);
+float o;
+vec4 s = tapCol(base, piv, lo, hi, em, tt, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, o);
+acc += s * (w * o);
+wsum += w;
+}
+fin = acc.rgb / max(wsum, 1e-4);
+finAlpha = acc.a / max(wsum, 1e-4);
+}
+if (mbMix < 0.999) {
+vec3 sharp;
+float sharpA;
+float o;
+if (needsSep) {
+vec4 k1 = tapCol(base, piv, lo, hi, em, t, redAmp, redPhase, rgbRXR, rgbRYR, rgbRZR, rgbRTR, o);
+vec4 k2 = tapCol(base, piv, lo, hi, em, t, greenAmp, greenPhase, rgbRXG, rgbRYG, rgbRZG, rgbRTG, o);
+vec4 k3 = tapCol(base, piv, lo, hi, em, t, blueAmp, bluePhase, rgbRXB, rgbRYB, rgbRZB, rgbRTB, o);
+sharp = vec3(k1.r, k2.g, k3.b);
+sharpA = (k1.a + k2.a + k3.a) / 3.0;
+} else {
+vec4 s = tapCol(base, piv, lo, hi, em, t, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, o);
+sharp = s.rgb;
+sharpA = s.a;
+}
+fin = mix(sharp, fin, mbMix);
+finAlpha = mix(sharpA, finAlpha, mbMix);
+}
+// Samples are premultiplied, so they are averaged premultiplied and only the
+// final alpha is normalised. Un-premultiplying per tap would let transparent
+// black taps drag the colour down and produce a dark fringe on the trail.
+fin = mix(original.rgb, fin, globalMix);
+finAlpha = mix(original.a, finAlpha, globalMix);
+fin = clamp(fin, 0.0, 1.0);
+gl_FragColor = vec4(fin, finAlpha);
+}]]></shader>
+</effect>

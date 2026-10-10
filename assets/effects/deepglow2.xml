@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="UTF-8"?><effect id="com.rilu.effects.deepglowpro" name="GM Deep Glow" desc="Multi-pass soft glow with chromatic pulse streaks" category="drawing" tags="glow,bloom,soft,gaussian,chromatic,pulse,streak" thumb="thumb/gm/deep_glow_new.webp" overdraw="true" max-overdraw="0.2">
+<params>
+<texture id="inputImg" srcType="content"/>
+<texture id="downImg" srcType="buffer" downsample="2"/>
+<texture id="h1" srcType="buffer" downsample="2"/>
+<texture id="v1" srcType="buffer" downsample="2"/>
+<texture id="h2" srcType="buffer" downsample="2"/>
+<texture id="v2" srcType="buffer" downsample="2"/>
+<texture id="h3" srcType="buffer" downsample="2"/>
+<texture id="v3" srcType="buffer" downsample="2"/>
+<section text="Glow"/>
+<spinner id="radius" default="50.0" min="0.5" max="200.0" step="0.1" label="Radius (px)"/>
+<spinner id="exposure" default="0.30" min="0.0" max="10.0" step="0.01" label="Exposure"/>
+<spinner id="softClipKnee" default="5.0" min="0.1" max="100.0" step="0.01" label="Soft Clip Knee"/>
+<spinner id="spread" default="1.2" min="0.5" max="100.0" step="0.05" label="Spread"/>
+<spinner id="glowTail" default="1.10" min="0.0" max="100.0" step="0.01" label="Tail Weight"/>
+<spinner id="glowOcclusion" default="3.0" min="0.0" max="100.0" step="0.01" label="Glow Coverage"/>
+<section text="Input"/>
+<spinner id="threshold" default="0.05" min="0.0" max="1.0" step="0.001" label="Threshold"/>
+<spinner id="thresholdSmooth" default="0.15" min="0.0" max="1.0" step="0.001" label="Threshold Smooth"/>
+<spinner id="thresholdGamma" default="1.0" min="0.2" max="3.0" step="0.01" label="Threshold Gamma"/>
+<section text="Style"/>
+<selector id="blendMode" style="dropdown" default="1" label="Blend Mode">
+<choice label="Add" value="1"/>
+<choice label="Screen" value="2"/>
+<choice label="Lighten" value="3"/>
+</selector>
+<section text="Tint"/>
+<color id="tint" default="#FFFFFF" label="Tint"/>
+<spinner id="tintStrength" default="0.5" min="0.0" max="1.0" step="0.01" label="Tint Strength"/>
+<section text="Shadow"/>
+<switch id="sshadow" default="false" label="Shadow"/>
+<spinner id="alphaa" default="1.25" min="0.0" max="2.0" step="0.01" label="Shadow Strength" ticks="0,1" snap="0,1" type="percent"/>
+<color id="shadowColor" default="#000000" label="Shadow Color" alpha="false"/>
+<spinner id="shadowAlpha" default="1.0" min="0.0" max="1.0" step="0.01" label="Opacity"/>
+<spinner id="direction" default="135.0" min="-3600" max="3600" step="0.5" type="angle" label="Direction"/>
+<spinner id="distance" default="5.0" min="0.0" max="300.0" step="0.1" label="Distance"/>
+<spinner id="softness" default="8.0" min="0.0" max="300.0" step="0.1" label="Softness"/>
+<switch id="shadowOnly" default="false" label="Shadow Only"/>
+<section text="Quality"/>
+<selector id="quality" style="radio" default="2" label="Quality">
+<choice label="Low" value="1"/>
+<choice label="Medium" value="2"/>
+<choice label="High" value="3"/>
+</selector>
+<section text="Output"/>
+<switch id="glowOnly" default="false" label="Glow Only"/>
+<spinner id="ditherAmount" default="0.015" min="0.0" max="0.05" step="0.001" label="Dither"/>
+<section text="PRO: Chromatic and Style"/>
+<spinner id="chromaShift" default="0.0" min="0.0" max="5.0" step="0.1" label="Chromatic Shift"/>
+<spinner id="glowSat" default="1.0" min="0.0" max="3.0" step="0.05" label="Glow Saturation"/>
+<spinner id="glowTemp" default="0.0" min="-1.0" max="1.0" step="0.05" label="Color Temp (-Cool +Warm)"/>
+<section text="PRO: Pulse"/>
+<spinner id="pulseAmt" default="0.0" min="0.0" max="1.0" step="0.01" label="Pulse Amount"/>
+<spinner id="pulsePhase" default="0.0" min="0.0" max="6.28" step="0.01" label="Pulse Phase (keyframe)"/>
+<section text="PRO: Streak and Vignette"/>
+<spinner id="streakAmt" default="0.0" min="0.0" max="1.0" step="0.01" label="Streak Amount"/>
+<spinner id="streakAngle" default="0.0" min="0.0" max="180.0" step="1.0" label="Streak Angle"/>
+<spinner id="vignetteAmt" default="0.0" min="0.0" max="1.0" step="0.05" label="Vignette"/>
+</params>
+<passes>
+<pass target="downImg"/>
+<pass target="h1"/>
+<pass target="v1"/>
+<pass target="h2"/>
+<pass target="v2"/>
+<pass target="h3"/>
+<pass target="v3"/>
+<pass/>
+</passes>
+<shader type="fragment" precision="high"><![CDATA[const float PI = 3.14159265358979323846;
+vec3 srgbToLinear(vec3 srgb){
+vec3 cut = step(vec3(0.04045), srgb);
+vec3 low = srgb / 12.92;
+vec3 high = pow((srgb + 0.055) / 1.055, vec3(2.4));
+return mix(low, high, cut);
+}
+vec3 linearToSrgb(vec3 lin){
+vec3 cut = step(vec3(0.0031308), lin);
+vec3 low = lin * 12.92;
+vec3 high = 1.055 * pow(lin, vec3(1.0/2.4)) - 0.055;
+return mix(low, high, cut);
+}
+vec4 blurInternal(sampler2D tex, vec2 texOffset, vec2 st, float numBlurPixelsPerSide)
+{
+if(numBlurPixelsPerSide <= 0.0) return texture2DCv(tex, st);
+highp vec3 incrementalGaussian;
+float adjSigma = numBlurPixelsPerSide / 2.14596602;
+incrementalGaussian.x = 1.0 / (sqrt(2.0 * PI) * max(adjSigma, 1e-4));
+incrementalGaussian.y = exp(-0.5 / (max(adjSigma, 1e-4) * max(adjSigma, 1e-4)));
+incrementalGaussian.z = incrementalGaussian.y * incrementalGaussian.y;
+vec4 avgValue = texture2DCv(tex, st).rgba * incrementalGaussian.x;
+highp float coefficientSum = incrementalGaussian.x;
+for (float i = 1.0; i <= 256.0; i += 2.0) {
+if (i > numBlurPixelsPerSide) break;
+float offset0 = i;
+float offset1 = i + 1.0;
+incrementalGaussian.xy *= incrementalGaussian.yz;
+coefficientSum += (2.0 * incrementalGaussian.x);
+float weight0 = incrementalGaussian.x;
+incrementalGaussian.xy *= incrementalGaussian.yz;
+coefficientSum += (2.0 * incrementalGaussian.x);
+float weight1 = incrementalGaussian.x;
+float weightL = weight0 + weight1;
+float offsetL = (offset0*weight0 + offset1*weight1) / max(weightL, 1e-6);
+vec2 stL = st - offsetL * texOffset;
+vec2 stR = st + offsetL * texOffset;
+avgValue += texture2DCv(tex, stL) * weightL;
+avgValue += texture2DCv(tex, stR) * weightL;
+}
+return avgValue / max(coefficientSum, 1e-6);
+}
+float tapsForQualityF(float q){
+return (q < 1.5) ? 8.0 : ((q < 2.5) ? 14.0 : 20.0);
+}
+float luminance(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+void main(){
+float taps = tapsForQualityF(float(quality));
+float r1 = radius;
+float r2 = radius * (1.8 + spread);
+float r3 = radius * (3.5 + 2.0*spread);
+vec2 uv = acScreenNorm;
+if (acPass == 0) {
+vec4 src4 = texture2DCv(inputImg.texture, uv);
+vec3 srcRGB = src4.rgb;
+float lum = luminance(srgbToLinear(srcRGB));
+lum = pow(max(lum, 0.0), thresholdGamma);
+float t = (thresholdSmooth <= 0.0) ? step(threshold, lum)
+: smoothstep(threshold - thresholdSmooth, threshold + thresholdSmooth, lum);
+vec3 glowSrc = srcRGB * t;
+gl_FragColor = vec4(glowSrc, src4.a);
+return;
+}
+if (acPass == 1) {
+vec2 to = vec2(1.0 / getTexSize(downImg.size).x, 0.0);
+float kernelSize = r1 * 0.5 * (taps/10.0);
+gl_FragColor = blurInternal(downImg.texture, to, uv, kernelSize);
+return;
+}
+if (acPass == 2) {
+vec2 to = vec2(0.0, 1.0 / getTexSize(h1.size).y);
+float kernelSize = r1 * 0.5 * (taps/10.0);
+gl_FragColor = blurInternal(h1.texture, to, uv, kernelSize);
+return;
+}
+if (acPass == 3) {
+vec2 to = vec2(1.0 / getTexSize(downImg.size).x, 0.0);
+float kernelSize = r2 * 0.5 * (taps/10.0);
+gl_FragColor = blurInternal(downImg.texture, to, uv, kernelSize);
+return;
+}
+if (acPass == 4) {
+vec2 to = vec2(0.0, 1.0 / getTexSize(h2.size).y);
+float kernelSize = r2 * 0.5 * (taps/10.0);
+gl_FragColor = blurInternal(h2.texture, to, uv, kernelSize);
+return;
+}
+if (acPass == 5) {
+vec2 to = vec2(1.0 / getTexSize(downImg.size).x, 0.0);
+float kernelSize = r3 * 0.5 * (taps/10.0);
+gl_FragColor = blurInternal(downImg.texture, to, uv, kernelSize);
+return;
+}
+if (acPass == 6) {
+vec2 to = vec2(0.0, 1.0 / getTexSize(h3.size).y);
+float kernelSize = r3 * 0.5 * (taps/10.0);
+gl_FragColor = blurInternal(h3.texture, to, uv, kernelSize);
+return;
+}
+vec4 src = texture2DCv(inputImg.texture, uv);
+vec3 b1;
+if (chromaShift > 0.001) {
+float cOff = chromaShift * 0.002;
+b1.r = texture2DCv(v1.texture, clamp(uv + vec2(cOff, 0.0), 0.0, 1.0)).r;
+b1.g = texture2DCv(v1.texture, uv).g;
+b1.b = texture2DCv(v1.texture, clamp(uv - vec2(cOff, 0.0), 0.0, 1.0)).b;
+} else {
+b1 = texture2DCv(v1.texture, uv).rgb;
+}
+vec3 b2 = texture2DCv(v2.texture, uv).rgb;
+vec4 b3s = texture2DCv(v3.texture, uv);
+vec3 b3 = b3s.rgb;
+float w2 = 0.6 * glowTail;
+float w3 = 0.3 * glowTail;
+vec3 glowLin = srgbToLinear(b1) + srgbToLinear(b2) * w2 + srgbToLinear(b3) * w3;
+float pulse = 1.0 + pulseAmt * sin(pulsePhase);
+glowLin *= max(pulse, 0.0);
+glowLin *= max(exposure, 0.0);
+glowLin = 1.0 - exp(-glowLin * softClipKnee);
+vec3 glowBase = linearToSrgb(glowLin);
+vec3 glow = mix(glowBase, glowBase * tint.rgb, clamp(tintStrength, 0.0, 1.0));
+vec3 tempTint = vec3(1.0 + glowTemp * 0.25, 1.0, 1.0 - glowTemp * 0.25);
+glow *= tempTint;
+float glowLuma = luminance(glow);
+glow = mix(vec3(glowLuma), glow, glowSat);
+if (streakAmt > 0.001) {
+float sRad = streakAngle * 0.0174533;
+vec2 sDir = vec2(cos(sRad), sin(sRad));
+vec3 streakCol = vec3(0.0);
+for (int i = -4; i <= 4; i++) {
+vec2 sUV = uv + sDir * float(i) * 0.01 * streakAmt;
+streakCol += texture2DCv(v1.texture, clamp(sUV, 0.0, 1.0)).rgb;
+}
+streakCol /= 9.0;
+glow += streakCol * streakAmt * 0.5;
+}
+float glowGate = smoothstep(0.0, 0.015, luminance(glow));
+glow *= glowGate;
+float glowA = clamp(b3s.a * glowOcclusion, 0.0, 1.0);
+vec4 base = src;
+if (sshadow) {
+vec2 imgSize = getTexSize(inputImg.size);
+float px = (1.0/imgSize.x);
+float py = (1.0/imgSize.y);
+float ang = radians(direction);
+vec2 offs = vec2(cos(ang), sin(ang)) * distance;
+vec2 shadowUV = uv + offs * vec2(px, py);
+float sscale = max(softness, 1.0);
+vec2 sprd = vec2(px, py) * sscale * 0.5;
+float a0 = texture2DCv(v3.texture, shadowUV).a;
+float a1 = texture2DCv(v3.texture, shadowUV + vec2(sprd.x, 0.0)).a;
+float a2 = texture2DCv(v3.texture, shadowUV - vec2(sprd.x, 0.0)).a;
+float a3 = texture2DCv(v3.texture, shadowUV + vec2(0.0, sprd.y)).a;
+float a4 = texture2DCv(v3.texture, shadowUV - vec2(0.0, sprd.y)).a;
+float a5 = texture2DCv(v3.texture, shadowUV + vec2(sprd.x, sprd.y)).a;
+float a6 = texture2DCv(v3.texture, shadowUV + vec2(-sprd.x, sprd.y)).a;
+float a7 = texture2DCv(v3.texture, shadowUV + vec2(sprd.x, -sprd.y)).a;
+float a8 = texture2DCv(v3.texture, shadowUV - vec2(sprd.x, -sprd.y)).a;
+float shadowA = (a0 + a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8) / 9.0;
+shadowA = clamp(shadowA * 1.8, 0.0, 1.0);
+shadowA = 1.0 - pow(max(0.0, 1.0 - shadowA), 0.45);
+float alphaEff = clamp(shadowAlpha * alphaa, 0.0, 1.0);
+vec4 outColor = vec4(shadowColor.rgb, clamp(shadowA * alphaEff, 0.0, 1.0));
+if (shadowOnly) {
+gl_FragColor = outColor;
+return;
+}
+float behindMask = 1.0 - step(0.001, base.a);
+base = base + outColor * behindMask;
+}
+vec3 srcLin = srgbToLinear(base.rgb);
+vec3 compLin;
+float bmf = float(blendMode);
+if (bmf < 1.5) {
+compLin = srcLin + srgbToLinear(glow);
+} else if (bmf < 2.5) {
+vec3 compS = 1.0 - (1.0 - base.rgb) * (1.0 - clamp(glow, 0.0, 100.0));
+compLin = srgbToLinear(compS);
+} else {
+compLin = max(srcLin, srgbToLinear(glow));
+}
+vec3 finalColor = linearToSrgb(compLin);
+float vig = 1.0 - vignetteAmt * smoothstep(0.3, 0.9, length(uv - 0.5));
+finalColor *= vig;
+vec2 imgPx = getTexSize(inputImg.size) * uv;
+vec2 ip = floor(imgPx);
+float n1 = fract(sin(dot(ip, vec2(12.9898,78.233))) * 43758.5453);
+float n2 = fract(sin(dot(ip, vec2(24.1230,17.3210))) * 12345.6789);
+float n3 = fract(sin(dot(ip, vec2(93.9890,67.3450))) * 98765.4321);
+vec3 dn = vec3(n1, n2, n3) - 0.5;
+float contentMask = smoothstep(0.0, 0.02, luminance(finalColor));
+finalColor = clamp(finalColor + dn * ditherAmount * contentMask, 0.0, 1.0);
+if (glowOnly) {
+finalColor = glow;
+gl_FragColor = vec4(finalColor, glowA);
+return;
+}
+float finalAlpha = clamp(base.a + glowA, 0.0, 1.0);
+gl_FragColor = vec4(finalColor, finalAlpha);
+}]]></shader>
+</effect>

@@ -1,0 +1,53 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect
+id="com.alightcreative.effects.hexagonlens"
+name="Hexagon Lens"
+desc="Amazing New Extra FX from the Modder"
+category="procedural"
+tags="other"
+thumb="thumb/SKEXNXX/lensh.webp"
+experimental="false">
+<params>
+<texture id="noisexx" srcType="image" src="textures/snoise.png" />
+<point id="position" label="Position" />
+<point id="orient" label="Orientation" step="0.01" />
+<slider id="MAX_ITERATIONS" label="Octave" default="5" min="0" max="10" step="1.0" type="integer"/>
+<color id="bgColor" default="#00000000" label="BG Color" alpha="true" />
+<color id="lightColor" default="#FFFFFFFF" label="Flare Color" alpha="true" />
+<section text="Advance Option" />
+<spinner id="XXK" label="Flare Interval" default="2.5" min="0.0" max="100.0" step="0.01" type="percent" />
+<spinner id="XXH" label="Hexagon Size" default="2.0" min="0.0" max="100.0" step="0.01" type="percent" />
+<spinner id="XXI" label="Hexagon Alpha" default="0.25" min="0.0" max="1.0" step="0.01" type="percent" />
+<spinner id="lensFlareScale" label="FlareScale" default="0.175" min="0.0" max="100.0" step="0.01" type="percent" />
+<spinner id="XXA" label="Small Circle" default="0.04" min="0.0" max="1.0" step="0.001" type="percent" />
+<spinner id="XXB" label="Big Circle" default="0.01" min="0.0" max="1.0" step="0.001" type="percent" />
+<spinner id="XXC" label="Alpha Circle" default="1.0" min="0.0" max="100.0" step="0.01" type="percent" />
+<spinner id="XXD" label="Intensity" default="0.075" min="0.0" max="100.0" step="0.01" type="percent" />
+<spinner id="XXE" label="BigCircle Size" default="0.2" min="0.0" max="100.0" step="0.01" type="percent" />
+<spinner id="lensFlareExposure" label="Exposure" default="1.0" min="0.0" max="100.0" step="0.01" type="percent" />
+<spinner id="lensFlareBrightness" label="Brightness" default="1.0" min="0.0" max="100.0" step="0.01" type="percent" />
+<spinner id="scale" default="1.0" min="0.1" max="50.0" step="0.01" label="Scale" type="percent" />
+<spinner id="angle" default="0.0" min="-3600" max="3600" ticks="-180,-135,-90,-45,-30,-15,0,15,30,45,90,135,180" label="Rotate" step="0.5" type="angle" />
+<point id="stretch" default="1.0,0.65" min="0.01,0.01" max="10, 10" label="@am:string/effect_param_stretch" step="0.01" />
+<spinner id="alpha" default="1.0" min="0.0" max="1.0" step="0.01" label="Alpha" type="percent" />
+<spinner id="hardness" default="1.0" min="1.0" max="3.0" step="0.01" label="Hard/Brightness" type="percent" />
+<selector id="blendMode" style="radio" default="3">
+<choice label="NORMAL" value="0" />
+<choice label="MULTIPLY" value="1" />
+<choice label="SCREEN" value="2" />
+<choice label="LAYER" value="3" />
+</selector>
+<texture id="inputImg" srcType="content" />
+<texture id="xcipher" srcType="buffer" />
+</params>
+<iterations param="iter" /> <passes> <pass target="xcipher" effect="636f6d2e616c6967687463726561746976652e656666656374732e68657861676f6e6c656e73"/> <pass /> </passes> <shader type="fragment" precision="high"><![CDATA[void main ()
+{
+const vec3 luminance = vec3(0.2126, 0.7152, 0.0722); float phiQuarter = 90.0 * 0.0174533; float enchantDecryption = 8.0;
+float keyDecryptSyamjaiDtz = 0.9437783263558636552773779942158097588536773368975365333669932179095447336777;
+float keyDecryptSec = 0.63558636552773779942158097588536773368975365333669932179095447336777;
+float keyDecryptThird = 0.73779942158097588536773368975365333669932179095447336777;
+keyDecryptSyamjaiDtz = 1.0;
+vec4 DecodingFX = texture2DCv(xcipher.texture,acScreenNorm)*keyDecryptSyamjaiDtz;
+gl_FragColor = DecodingFX;
+}]]></shader>
+</effect>

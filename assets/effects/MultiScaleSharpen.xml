@@ -1,0 +1,72 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.custom.effects.multiscalesharpen"
+name="Sharpen 2"
+desc="Adaptive multi-scale sharpening"
+category="color"
+thumb="thumb/sharpen2.webp"
+tags="sharpen,enhance,detail">
+<params>
+<texture id="inputImg" srcType="content" />
+<spinner id="sharpenAmp" default="0.30" min="0.0" max="1000.0" step="0.01" label="Sharpen Amp" />
+<spinner id="edgeThreshold" default="0.00" min="0.0" max="0.5" step="0.01" label="Edge Threshold" />
+<spinner id="smallDetailSize" default="1.70" min="0.1" max="1000.0" step="0.01" label="Small Detail Size" />
+<spinner id="scaleTiny" default="10.00" min="0.0" max="1000.0" step="0.1" label="Scale Tiny Details" />
+<spinner id="scaleSmall" default="10.00" min="0.0" max="1000.0" step="0.1" label="Scale Small Details" />
+<spinner id="scaleMedium" default="0.00" min="0.0" max="1000.0" step="0.1" label="Scale Medium Details" />
+<spinner id="scaleLarge" default="10.00" min="0.0" max="1000.0" step="0.1" label="Scale Large Details" />
+<spinner id="sharpenLuma" default="1.20" min="0.0" max="3.0" step="0.01" label="Sharpen Luma" />
+<spinner id="sharpenChroma" default="1.00" min="0.0" max="3.0" step="0.01" label="Sharpen Chroma" />
+<spinner id="sharpenRed" default="1.02" min="0.0" max="3.0" step="0.01" label="Sharpen Red" />
+<spinner id="sharpenGreen" default="1.00" min="0.0" max="3.0" step="0.01" label="Sharpen Green" />
+<spinner id="sharpenBlue" default="1.00" min="0.0" max="3.0" step="0.01" label="Sharpen Blue" />
+</params>
+<shader type="fragment" group="0" precision="high"><![CDATA[const vec3 kY = vec3(0.299, 0.587, 0.114);
+const vec3 kI = vec3(0.596, -0.275, -0.321);
+const vec3 kQ = vec3(0.212, -0.523, 0.311);
+vec3 rgb2yiq(vec3 rgb) {
+return vec3(dot(rgb, kY), dot(rgb, kI), dot(rgb, kQ));
+}
+vec3 yiq2rgb(vec3 yiq) {
+vec3 rgb;
+rgb.r = yiq.x + 0.956 * yiq.y + 0.621 * yiq.z;
+rgb.g = yiq.x - 0.272 * yiq.y - 0.647 * yiq.z;
+rgb.b = yiq.x - 1.105 * yiq.y + 1.702 * yiq.z;
+return rgb;
+}
+vec3 getBlur(vec2 uv, float radius) {
+vec2 off = vec2(radius) / acScreenSize;
+vec3 acc = texture2DCv(inputImg.texture, uv + vec2(-off.x, -off.y)).rgb;
+acc += texture2DCv(inputImg.texture, uv + vec2( off.x, -off.y)).rgb;
+acc += texture2DCv(inputImg.texture, uv + vec2(-off.x,  off.y)).rgb;
+acc += texture2DCv(inputImg.texture, uv + vec2( off.x,  off.y)).rgb;
+return acc * 0.25;
+}
+void main() {
+vec2 uv = acScreenNorm;
+vec3 c0 = texture2DCv(inputImg.texture, uv).rgb;
+float s = smallDetailSize;
+vec3 bTiny  = getBlur(uv, s * 0.5);
+vec3 bSmall = getBlur(uv, s * 1.0);
+vec3 bMed   = getBlur(uv, s * 2.0);
+vec3 bLarge = getBlur(uv, s * 4.0);
+vec3 dTiny  = c0 - bTiny;
+vec3 dSmall = bTiny - bSmall;
+vec3 dMed   = bSmall - bMed;
+vec3 dLarge = bMed - bLarge;
+vec3 detail = dTiny * scaleTiny
++ dSmall * scaleSmall
++ dMed * scaleMedium
++ dLarge * scaleLarge;
+float detailLuma = dot(abs(detail), kY);
+float gate = smoothstep(edgeThreshold, edgeThreshold + 0.05, detailLuma);
+detail *= gate;
+vec3 detailYIQ = rgb2yiq(detail);
+detailYIQ.x *= sharpenLuma;
+detailYIQ.y *= sharpenChroma;
+detailYIQ.z *= sharpenChroma;
+detail = yiq2rgb(detailYIQ);
+detail *= vec3(sharpenRed, sharpenGreen, sharpenBlue);
+vec3 result = c0 + detail * sharpenAmp;
+gl_FragColor = vec4(result, 1.0);
+}]]></shader>
+</effect>

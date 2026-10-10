@@ -1,0 +1,56 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<effect id="com.alightcreative.effects.rays_edge" name="Rays Edge" desc="Multipass rays from character edges" category="blur" thumb="thumb/edgerays.webp" tags="rays,edges,stylize">
+<params>
+<texture id="inputImg" srcType="content" />
+<texture id="edge" srcType="buffer" />
+<spinner id="edgeThreshold" default="1.0" min="0.00" max="1.00" step="0.01" label="Edge Threshold" />
+<spinner id="brightThreshold" default="0.30" min="0.00" max="1.00" step="0.01" label="Bright Threshold" />
+<spinner id="feather" default="20.0" min="0.0" max="20.0" step="0.5" label="Feather (px)" />
+<switch id="useLuma" default="true" label="Use Luminance" />
+<point id="centerPoint" label="Center" />
+<spinner id="strength" default="1.20" min="0.0" max="4.0" step="0.01" label="Length" />
+<spinner id="intensity" default="5.0" min="0.0" max="5.0" step="0.01" label="Intensity" />
+<spinner id="threshold" default="0.0" min="0.0" max="1.0" step="0.01" label="Threshold" />
+<color id="thresholdColor" default="#FF000000" label="Threshold Add" alpha="false" />
+<color id="fillColor" default="#FFFFFF" label="Color" alpha="false" />
+<slider id="blend" default="0.00" min="0.0" max="1" label="Blend" type="percent" />
+<slider id="quality" default="150.0" min="10.0" max="800.0" step="1" label="Quality" ticks="150" />
+</params>
+<passes>
+<pass target="edge" effect="com.alightcreative.effects.rays_edge_detect" />
+<pass />
+</passes>
+<shader type="fragment" precision="high"><![CDATA[const vec3 luminanceWeighting = vec3(0.2126, 0.7152, 0.0722);
+vec4 src(vec2 uv){ return texture2DCv(inputImg.texture, uv); }
+vec4 eTex(vec2 uv){ return texture2DCv(edge.texture, uv); }
+void main(){
+vec2 texelSize = 1.0 / inputImg.size;
+vec2 center = vec2(0.5 + centerPoint.x/500., 0.5 - centerPoint.y/500.);
+vec2 v = acScreenNorm.st - (vec4(center,0.0,1.0) * acLayerToScreen).xy;
+float speed = length(strength / 2.0 / texelSize);
+speed *= length( acLayerNorm.st - center );
+int nSamples = int(quality);
+vec4 baseColor = src(acScreenNorm.st);
+vec2 vnorm = normalize(v)*texelSize*speed;
+vec2 offsetScale = vec2(1., 1.);
+if( acScreenSize.y > acScreenSize.x ) {
+offsetScale.x *= acScreenSize.x / acScreenSize.y;
+} else {
+offsetScale.y *= acScreenSize.y / acScreenSize.x;
+}
+float actualSamples = 1.0;
+vec4 outColor = vec4(0.0);
+for(int i=1; i<64; i++ ) {
+if(i>=nSamples) break;
+float p = float(i) / float(nSamples - 1);
+vec2 offs = vnorm * p;
+offs *= offsetScale;
+vec4 texColor = src(acScreenNorm.st-offs);
+vec4 edgeColor = eTex(acScreenNorm.st-offs);
+float luminance = dot(edgeColor.rgb - thresholdColor.rgb, luminanceWeighting);
+outColor += luminance > threshold ? mix(texColor,fillColor,blend)*(1.-p) : vec4(0.0);
+actualSamples += luminance > threshold ? 1.0 : 0.0;
+}
+gl_FragColor = baseColor + outColor * intensity / float(nSamples);
+}]]></shader>
+</effect>

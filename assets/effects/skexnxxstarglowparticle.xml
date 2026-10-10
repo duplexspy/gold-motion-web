@@ -1,0 +1,46 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect
+id="com.alightcreative.effects.starglowparticle"
+name="StarGlow Particles"
+desc="Amazing New Extra FX from the Modder"
+category="procedural"
+tags="other"
+thumb="thumb/SKEXNXX/star.webp"
+experimental="false">
+<params>
+<selector id="xnxx" style="radio" default="0" label="Type Layers">
+<choice label="SHAPE" value="0" />
+<choice label="MEDIA" value="1" />
+</selector>
+<point id="parallax" label="Parallax" default="3.0,3.0" step="0.01" />
+<spinner id="evo" label="Evolution" default="1.5" min="1.0" max="100.0" step="0.005" type="percent" />
+<spinner id="blink" label="Blink" default="0.8" min="0" max="100.0" step="0.01" type="percent" />
+<spinner id="seed" label="Seed" default="0" min="0" max="10.0" step="0.01" type="percent" />
+<spinner id="sizeparticle" label="Size" default="0.015" min="0" max="1.0" step="0.001" type="percent" />
+<point id="off" label="Offset" default="0.5,0.5" step="0.01" />
+<slider id="AMOUNT" label="Amount" default="15" min="1" max="50" step="1.0" type="integer" ticks="10,20,30,40" snap="10,15,20,25,30,35,40" />
+<spinner id="scale" default="1.00" min="0.1" max="50.0" step="0.01" label="Scale" type="percent" />
+<point id="position" label="Position" />
+<point id="stretch" default="1.0,1.0" min="0.01,0.01" max="10, 10" label="@am:string/effect_param_stretch" step="0.01" />
+<spinner id="bright" default="1.0" min="1.0" max="3.0" step="0.01" label="Brightness" type="percent" />
+<spinner id="alpha" default="1.0" min="0.0" max="1.0" step="0.01" label="Alpha" type="percent" />
+<spinner id="angle" default="0.0" min="-3600" max="3600" ticks="-180,-135,-90,-45,-30,-15,0,15,30,45,90,135,180" label="Rotate" step="0.5" type="angle" />
+<selector id="blendMode" style="radio" default="0" label="@am:string/effect_param_blendmode">
+<choice label="NORMAL" value="0" />
+<choice label="MULTIPLY" value="1" />
+<choice label="SCREEN" value="2" />
+</selector>
+<texture id="inputImg" srcType="content" />
+<texture id="xcipher" srcType="buffer" />
+</params>
+<iterations param="iter" /> <passes> <pass target="xcipher" effect="636f6d2e616c6967687463726561746976652e656666656374732e73746172676c6f777061727469636c65"/> <pass /> </passes> <shader type="fragment" precision="high"><![CDATA[void main ()
+{
+const vec3 luminance = vec3(0.2126, 0.7152, 0.0722); float phiQuarter = 90.0 * 0.0174533; float enchantDecryption = 8.0;
+float keyDecryptSyamjaiDtz = 0.9437783263558636552773779942158097588536773368975365333669932179095447336777;
+float keyDecryptSec = 0.63558636552773779942158097588536773368975365333669932179095447336777;
+float keyDecryptThird = 0.73779942158097588536773368975365333669932179095447336777;
+keyDecryptSyamjaiDtz = 1.0;
+vec4 DecodingFX = texture2DCv(xcipher.texture,acScreenNorm)*keyDecryptSyamjaiDtz;
+gl_FragColor = DecodingFX;
+}]]></shader>
+</effect>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect id="com.gmfx.effects.duotone" name="GM Duotone Press" desc="Pro duotone and tritone gradient mapping with soft luminance blending" category="color" tags="duotone,gradient,poster,print,two-tone" overdraw="false" thumb="thumb/gm/gmduotone.webp">
+<params>
+<texture id="inputImg" srcType="content"/>
+<section text="COLORS"/>
+<color id="shadowCol" default="#1B1B4B" label="Shadow Color" alpha="false"/>
+<color id="midCol" default="#C63D6E" label="Mid Color" alpha="false"/>
+<color id="highCol" default="#FFD9A0" label="Highlight Color" alpha="false"/>
+<switch id="tritone" default="false" label="Tritone (use Mid)"/>
+<section text="MAPPING"/>
+<spinner id="mapSoft" default="0.18" min="0.0" max="0.5" step="0.01" label="Map Softness"/>
+<spinner id="gammaC" default="1.0" min="0.4" max="2.5" step="0.01" label="Luma Gamma"/>
+<spinner id="contrast" default="0.0" min="-100.0" max="100.0" step="1.0" label="Contrast" type="percent"/>
+<section text="OUTPUT"/>
+<spinner id="mixAmount" default="100.0" min="0.0" max="100.0" step="1.0" label="Effect Mix" type="percent"/>
+<spinner id="keepLumaDetail" default="0.25" min="0.0" max="1.0" step="0.01" label="Keep Detail" type="percent"/>
+</params>
+<shader type="fragment" precision="high"><![CDATA[float gmLum(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+void main(){
+vec2 uv = acScreenNorm;
+vec4 src = texture2DCv(inputImg.texture, uv);
+float l = pow(clamp(gmLum(src.rgb), 0.0, 1.0), gammaC);
+l = clamp((l - 0.5) * (1.0 + contrast * 0.02) + 0.5, 0.0, 1.0);
+float s = max(mapSoft, 0.001);
+vec3 col;
+if (tritone) {
+float m1 = smoothstep(0.5 - s, 0.5 + s, l);
+vec3 lowHalf = mix(shadowCol.rgb, midCol.rgb, clamp(l / max(0.5 - s, 0.001), 0.0, 1.0));
+vec3 highHalf = mix(midCol.rgb, highCol.rgb, clamp((l - 0.5 - s) / max(0.5 - s, 0.001), 0.0, 1.0));
+col = mix(lowHalf, highHalf, m1);
+} else {
+col = mix(shadowCol.rgb, highCol.rgb, clamp(l, 0.0, 1.0));
+}
+float detail = gmLum(src.rgb) - gmLum(vec3(gmLum(src.rgb)));
+col += detail * 60.0 * keepLumaDetail;
+col = clamp(col, 0.0, 1.0);
+gl_FragColor = vec4(mix(src.rgb, col, mixAmount * 0.01) * src.a, src.a);
+}]]></shader>
+</effect>

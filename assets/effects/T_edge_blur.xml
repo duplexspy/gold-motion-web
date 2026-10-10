@@ -1,0 +1,47 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.edgeblur" name="T_Edge Blur" desc="Blurs only the edges of the image" category="blur" tags="edge,blur,soften" thumb="thumb/EdgeBlur.jpg">
+<strings>
+<locale lang="en">
+<string name="edgeThreshold">Edge Threshold</string>
+<string name="edgeIntensity">Edge Intensity</string>
+<string name="blurAmount">Blur Amount</string>
+</locale>
+</strings>
+<params>
+<texture id="inputImg" srcType="content" />
+<spinner id="edgeThreshold" default="0.29" min="0.0" max="0.5" step="0.01" label="@string/edgeThreshold" />
+<spinner id="edgeGain" default="4.80" min="1.0" max="20.0" step="0.1" label="@string/edgeIntensity" />
+<spinner id="blurRadius" default="4.70" min="0.0" max="10.0" step="0.1" label="@string/blurAmount" />
+</params>
+<shader type="fragment" precision="high"><![CDATA[void main() {
+vec2 uv = acScreenNorm;
+vec2 texel = vec2(1.0) / inputImg.size;
+float gx = 0.0;
+float gy = 0.0;
+for(int i = -1; i <= 1; i++){
+for(int j = -1; j <= 1; j++){
+vec3 s = texture2DCv(inputImg.texture, uv + vec2(float(i), float(j)) * texel).rgb;
+float intensity = dot(s, vec3(0.299, 0.587, 0.114));
+if(i != 0) gx += intensity * float(i) * ((j == 0) ? 2.0 : 1.0);
+if(j != 0) gy += intensity * float(j) * ((i == 0) ? 2.0 : 1.0);
+}
+}
+float edge = sqrt(gx*gx + gy*gy);
+float mask = smoothstep(edgeThreshold, edgeThreshold + 0.1, edge * edgeGain);
+mask = clamp(mask, 0.0, 1.0);
+vec3 blurCol = vec3(0.0);
+float total = 0.0;
+const int R = 4;
+vec2 blurStep = texel * (blurRadius / float(R));
+for(int x = -R; x <= R; x++) {
+for(int y = -R; y <= R; y++) {
+blurCol += texture2DCv(inputImg.texture, uv + vec2(float(x), float(y)) * blurStep).rgb;
+total += 1.0;
+}
+}
+blurCol /= total;
+vec4 original = texture2DCv(inputImg.texture, uv);
+vec3 col = mix(original.rgb, blurCol, mask);
+gl_FragColor = vec4(col, original.a);
+}]]></shader>
+</effect>

@@ -1,0 +1,274 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.shatter_break"
+name="Shatter Break"
+desc="Break image into blocks or glass shards"
+category="distort"
+tags="shatter,break,glass,block,explode"
+thumb="thumb/shatter.webp">
+<params>
+<texture id="inputImg" srcType="content"/>
+<texture id="shapeTex" srcType="content" label="Custom Shape (Alpha)"/>
+<section text="Shatter"/>
+<spinner id="progress" default="0.0" min="0.0" max="1.0" step="0.001" label="Progress"/>
+<selector id="style" style="dropdown" default="1" label="Shard Type">
+<choice label="Blocks" value="0"/>
+<choice label="Glass" value="1"/>
+<choice label="3D Cubes" value="2"/>
+<choice label="3D Spheres" value="3"/>
+<choice label="3D Thick Glass" value="4"/>
+<choice label="Window" value="5"/>
+<choice label="3D Puzzle" value="6"/>
+<choice label="Custom" value="7"/>
+</selector>
+<spinner id="grid" default="30.0" min="5.0" max="200.0" step="1.0" label="Shard Size (px)"/>
+<section text="Physics"/>
+<point id="origin" default="0.5,0.5" label="Center"/>
+<spinner id="strength" default="0.5" min="0.0" max="2.0" step="0.01" label="Explosion Force"/>
+<spinner id="gravity" default="0.5" min="-2.0" max="2.0" step="0.01" label="Gravity"/>
+<spinner id="rotation" default="180.0" min="0.0" max="1000.0" step="1.0" label="Rotation"/>
+<section text="3D Camera"/>
+<xyz id="sceneRotation" default="0,0,0" label="Scene Rotation" type="rotate"/>
+<section text="Randomness"/>
+<spinner id="randomness" default="0.5" min="0.0" max="1.0" step="0.01" label="Variation"/>
+<spinner id="seed" default="0" min="0" max="10000" step="1" label="Seed"/>
+</params>
+<shader type="fragment" precision="high"><![CDATA[float hash(vec2 p) {
+vec3 p3  = fract(vec3(p.xyx) * .1031);
+p3 += dot(p3, p3.yzx + 33.33);
+return fract((p3.x + p3.y) * p3.z);
+}
+mat2 rot2(float a){ float s = sin(a), c = cos(a); return mat2(c,-s,s,c); }
+mat3 rotX(float a) { float c=cos(a), s=sin(a); return mat3(1,0,0, 0,c,-s, 0,s,c); }
+mat3 rotY(float a) { float c=cos(a), s=sin(a); return mat3(c,0,s, 0,1,0, -s,0,c); }
+mat3 rotZ(float a) { float c=cos(a), s=sin(a); return mat3(c,-s,0, s,c,0, 0,0,1); }
+mat3 transpose3(mat3 m) {
+return mat3(
+m[0][0], m[1][0], m[2][0],
+m[0][1], m[1][1], m[2][1],
+m[0][2], m[1][2], m[2][2]
+);
+}
+mat3 getRot3D(vec3 r) {
+vec3 rad = radians(r);
+return rotY(rad.y) * rotX(rad.x) * rotZ(rad.z);
+}
+float iSphere(vec3 ro, vec3 rd, float r) {
+float b = dot(ro, rd);
+float c = dot(ro, ro) - r*r;
+float h = b*b - c;
+if(h < 0.0) return -1.0;
+return -b - sqrt(h);
+}
+vec2 iBox(vec3 ro, vec3 rd, vec3 boxSize, out vec3 outNormal) {
+vec3 m = 1.0 / rd;
+vec3 n = m * ro;
+vec3 k = abs(m) * boxSize;
+vec3 t1 = -n - k;
+vec3 t2 = -n + k;
+float tN = max(max(t1.x, t1.y), t1.z);
+float tF = min(min(t2.x, t2.y), t2.z);
+if(tN > tF || tF < 0.0) return vec2(-1.0);
+outNormal = -sign(rd) * step(t1.yzx, t1.xyz) * step(t1.zxy, t1.xyz);
+return vec2(tN, tF);
+}
+float sdCircle(vec2 p, float r) { return length(p) - r; }
+float sdfPuzzle(vec2 p, vec2 cid, float size) {
+float d = max(abs(p.x) - size, abs(p.y) - size);
+float tabSize = size * 0.35;
+float tabPos = size;
+float tR = (hash(cid + vec2(0.5, 0.0)) > 0.5) ? 1.0 : -1.0;
+d = (tR > 0.0) ? min(d, sdCircle(p - vec2(tabPos, 0.0), tabSize)) : max(d, -sdCircle(p - vec2(tabPos, 0.0), tabSize));
+float tT = (hash(cid + vec2(0.0, 0.5)) > 0.5) ? 1.0 : -1.0;
+d = (tT > 0.0) ? min(d, sdCircle(p - vec2(0.0, tabPos), tabSize)) : max(d, -sdCircle(p - vec2(0.0, tabPos), tabSize));
+float tL = (hash(cid - vec2(0.5, 0.0)) > 0.5) ? -1.0 : 1.0;
+d = (tL > 0.0) ? min(d, sdCircle(p + vec2(tabPos, 0.0), tabSize)) : max(d, -sdCircle(p + vec2(tabPos, 0.0), tabSize));
+float tB = (hash(cid - vec2(0.0, 0.5)) > 0.5) ? -1.0 : 1.0;
+d = (tB > 0.0) ? min(d, sdCircle(p + vec2(0.0, tabPos), tabSize)) : max(d, -sdCircle(p + vec2(0.0, tabPos), tabSize));
+return d;
+}
+struct Shard {
+vec2 disp;
+float rot;
+vec2 pivot;
+float depth;
+float scale;
+mat3 rot3d;
+vec2 uvOffset;
+};
+Shard getShard(vec2 cid, int k, float t, float g) {
+Shard S;
+vec2 cellCenter = (cid + 0.5) * g;
+float rnd = hash(cid + vec2(float(k)*1.23, float(seed)));
+S.uvOffset = vec2(hash(cid + rnd), hash(cid - rnd)) - 0.5;
+S.pivot = cellCenter / acScreenSize;
+vec2 centerPx = origin * acScreenSize;
+vec2 dir = cellCenter - centerPx;
+float d = length(dir);
+vec2 normDir = dir / max(d, 1.0);
+float angleVar = (rnd - 0.5) * randomness * 2.0;
+normDir = rot2(angleVar) * normDir;
+float forceMag = strength * 500.0 * (1.0 + (rnd - 0.5) * randomness);
+vec2 vel = normDir * forceMag;
+vec2 grav = vec2(0.0, -gravity * 1000.0);
+float time = t * 2.0;
+S.disp = (vel * time + 0.5 * grav * time * time) / acScreenSize;
+S.rot = radians(rotation) * time * (rnd - 0.5) * 2.0;
+float bZ = (style == 5) ? -3.0 : 1.0;
+S.depth = time * (rnd + 0.5) * bZ;
+S.scale = 1.0 / (1.0 + max(S.depth, -0.9) * 0.5);
+vec3 worldRot = vec3(0.0, 0.0, degrees(S.rot)) + sceneRotation;
+S.rot3d = getRot3D(worldRot);
+return S;
+}
+vec4 checkPiece(vec2 cidC, int k, float t, float g, vec2 uvNow, out bool found, out float dOut) {
+Shard S = getShard(cidC, k, t, g);
+float aspect = acScreenSize.x / acScreenSize.y;
+if (style <= 1 || style == 5 || style == 7) {
+vec2 uv0 = uvNow - S.disp;
+vec2 pRel = uv0 - S.pivot;
+pRel.x *= aspect;
+pRel /= S.scale;
+pRel = rot2(-S.rot) * pRel;
+pRel.x /= aspect;
+uv0 = pRel + S.pivot;
+vec2 px0 = uv0 * acScreenSize;
+vec2 cid0 = floor(px0 / g);
+vec2 q = fract(px0 / g);
+bool matchCell = length(cid0 - cidC) < 0.1;
+bool isGlass = (style == 1 || style == 5);
+bool insideShape = (!isGlass) ? true : ((k == 0) ? (q.x + q.y < 1.0) : (q.x + q.y >= 1.0));
+if (style == 7) {
+vec4 mask = texture2DCv(shapeTex.texture, q);
+insideShape = (mask.a > 0.5);
+}
+found = matchCell && insideShape;
+if (found) {
+vec4 col = texture2DCv(inputImg.texture, clamp(uv0, 0.0, 1.0));
+if (col.a < 0.01) { found = false; return vec4(0.0); }
+dOut = S.depth;
+return col;
+}
+return vec4(0.0);
+} else {
+vec3 ro = vec3((uvNow - S.pivot), -1.0);
+ro.x *= aspect;
+ro.xy -= S.disp * vec2(aspect, 1.0);
+ro.z -= S.depth;
+vec3 rd = normalize(vec3(0.0, 0.0, 1.0));
+mat3 invRot = transpose3(S.rot3d);
+vec3 roL = invRot * ro;
+vec3 rdL = invRot * rd;
+float dHit = -1.0;
+vec3 normal = vec3(0.0, 0.0, -1.0);
+float shardSize = (g / acScreenSize.y) * 0.5;
+if (style == 2 || style == 4) {
+float zThick = (style == 4) ? shardSize * 0.2 : shardSize;
+vec3 bSize = (style == 4) ? vec3(shardSize, shardSize, zThick) : vec3(shardSize);
+vec2 res = iBox(roL, rdL, bSize, normal);
+if (res.x > 0.0) dHit = res.x;
+} else if (style == 3) {
+dHit = iSphere(roL, rdL, shardSize);
+normal = normalize(roL + rdL * dHit);
+} else if (style == 6) {
+float zThick = shardSize * 0.15;
+vec3 bNormal;
+vec2 bRes = iBox(roL, rdL, vec3(shardSize * 1.5, shardSize * 1.5, zThick), bNormal);
+if (bRes.x > 0.0) {
+float tMar = bRes.x;
+for (int i = 0; i < 12; i++) {
+vec3 p = roL + rdL * tMar;
+float d2d = sdfPuzzle(p.xy, cidC, shardSize);
+float d3d = max(d2d, abs(p.z) - zThick);
+if (d3d < 0.001) {
+dHit = tMar;
+vec2 e = vec2(0.001, 0.0);
+float dP = sdfPuzzle(p.xy, cidC, shardSize);
+vec2 n2d = normalize(vec2(
+sdfPuzzle(p.xy + e.xy, cidC, shardSize) - sdfPuzzle(p.xy - e.xy, cidC, shardSize),
+sdfPuzzle(p.xy + e.yx, cidC, shardSize) - sdfPuzzle(p.xy - e.yx, cidC, shardSize)
+));
+if (abs(p.z) > zThick - 0.002) {
+normal = vec3(0.0, 0.0, sign(p.z));
+} else {
+normal = vec3(n2d, 0.0);
+}
+break;
+}
+tMar += d3d;
+if (tMar > bRes.y) break;
+}
+}
+} else if (style == 7) {
+float zThick = shardSize * 0.1;
+vec3 bNormal;
+vec2 bRes = iBox(roL, rdL, vec3(shardSize, shardSize, zThick), bNormal);
+if (bRes.x > 0.0) {
+vec3 p = roL + rdL * bRes.x;
+vec2 q = (p.xy / (shardSize * 2.0)) + 0.5;
+vec4 mask = texture2DCv(shapeTex.texture, q);
+if (mask.a > 0.5) {
+dHit = bRes.x;
+normal = bNormal;
+}
+}
+}
+if (dHit > 0.0) {
+vec3 pHit = roL + rdL * dHit;
+vec3 worldNormal = S.rot3d * normal;
+vec2 uv0 = (pHit.xy / (shardSize * 2.0)) + 0.5;
+vec2 sampleUV = S.pivot + (uv0 - 0.5) * (g / acScreenSize);
+vec4 col = texture2DCv(inputImg.texture, clamp(sampleUV, 0.0, 1.0));
+if (col.a < 0.01) { found = false; return vec4(0.0); }
+vec3 lightDir = normalize(vec3(0.5, 0.5, -1.0));
+float diff = max(dot(worldNormal, lightDir), 0.0);
+float ambient = 0.4;
+col.rgb *= (ambient + (1.0 - ambient) * diff);
+found = true;
+dOut = S.depth + dHit * 0.1;
+return col;
+}
+}
+found = false;
+return vec4(0.0);
+}
+void main() {
+if (progress <= 0.001) {
+gl_FragColor = texture2DCv(inputImg.texture, acScreenNorm);
+return;
+}
+vec2 uv = acScreenNorm;
+float g = max(grid, 5.0);
+vec2 px = uv * acScreenSize;
+vec2 baseCid = floor(px / g);
+float t = progress;
+int R = int(min(2.0 + strength * t * 20.0, 10.0));
+vec4 bestCol = vec4(0.0);
+float minDepth = 10000.0;
+bool hit = false;
+vec2 winnerCid = vec2(0.0);
+int winnerK = 0;
+int kMax = (style == 1 || style == 5) ? 2 : 1;
+for (int y = -R; y <= R; y++) {
+for (int x = -R; x <= R; x++) {
+vec2 cidC = baseCid + vec2(float(x), float(y));
+for (int k = 0; k < kMax; k++) {
+bool found;
+float dHit;
+vec4 res = checkPiece(cidC, k, t, g, uv, found, dHit);
+if (found) {
+if (dHit < minDepth) {
+minDepth = dHit;
+hit = true;
+bestCol = res;
+}
+}
+}
+}
+}
+if (hit) {
+gl_FragColor = bestCol;
+} else {
+gl_FragColor = vec4(0.0);
+}
+}]]></shader>
+</effect>

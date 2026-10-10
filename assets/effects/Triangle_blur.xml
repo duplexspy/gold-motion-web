@@ -1,0 +1,81 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.triangleblur"
+name="Triangle Blur"
+desc="Professional multi-pass triangular bokeh blur with highlight boost and chromatic fringe"
+category="blur"
+tags="blur,glow,stylize,raster,essentials,production"
+thumb="thumb/gaussian_blur.webp"
+overdraw="true"
+max-overdraw="0.1">
+<params>
+<texture id="inputImg" srcType="content" />
+<texture id="down"     srcType="buffer" downsample="2" />
+<texture id="pass1"    srcType="buffer" downsample="2" />
+<texture id="pass2"    srcType="buffer" downsample="2" />
+<texture id="pass3"    srcType="buffer" downsample="2" />
+<section text="Blur Controls" />
+<spinner id="strength" default="0.8" min="0.0" max="3.0" step="0.01" label="Strength" type="percent" />
+<spinner id="angle"    default="0.0" min="0.0" max="360.0" step="1.0" label="Angle" type="angle" />
+<section text="Bokeh &amp; Highlights" />
+<spinner id="bokehBoost" default="0.6" min="0.0" max="2.0" step="0.02" label="Bokeh Gain" type="percent" />
+<spinner id="aberration" default="0.3" min="0.0" max="1.0" step="0.01" label="Chromatic Fringe" type="percent" />
+<section text="Output Mix" />
+<spinner id="mix" default="1.0" min="0.0" max="1.0" step="0.01" label="Mix" type="percent" />
+</params>
+<passes>
+<pass target="down" />
+<pass target="pass1" />
+<pass target="pass2" />
+<pass target="pass3" />
+<pass />
+</passes>
+<shader type="fragment" precision="high"><![CDATA[#define PI 3.14159265359
+vec2 getDir(float deg) {
+float rad = deg * (PI / 180.0);
+return vec2(cos(rad), sin(rad));
+}
+void main() {
+vec2 aspect = vec2(1.0, acScreenSize.x / acScreenSize.y);
+float baseRad = strength * 0.035;
+if (acPass == 0) {
+vec4 col = texture2DCv(inputImg.texture, acScreenNorm);
+vec3 rgb = col.rgb;
+float luma = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
+vec3 boosted = rgb + rgb * pow(luma, 1.8) * (bokehBoost * 2.5);
+gl_FragColor = vec4(boosted, col.a);
+} else if (acPass == 1) {
+vec2 dir = getDir(angle) * aspect * baseRad;
+vec4 acc = vec4(0.0);
+for (int i = -7; i <= 7; i++) {
+float t = float(i) / 7.0;
+acc += texture2DCv(down.texture, acScreenNorm + dir * t);
+}
+gl_FragColor = acc / 15.0;
+} else if (acPass == 2) {
+vec2 dir = getDir(angle + 120.0) * aspect * baseRad;
+vec4 acc = vec4(0.0);
+for (int i = -7; i <= 7; i++) {
+float t = float(i) / 7.0;
+acc += texture2DCv(pass1.texture, acScreenNorm + dir * t);
+}
+gl_FragColor = acc / 15.0;
+} else if (acPass == 3) {
+vec2 dir = getDir(angle + 240.0) * aspect * baseRad;
+vec4 acc = vec4(0.0);
+for (int i = -7; i <= 7; i++) {
+float t = float(i) / 7.0;
+acc += texture2DCv(pass2.texture, acScreenNorm + dir * t);
+}
+gl_FragColor = acc / 15.0;
+} else {
+vec4 orig = texture2DCv(inputImg.texture, acScreenNorm);
+vec2 fringeDir = (acScreenNorm - 0.5) * (aberration * 0.015);
+float r = texture2DCv(pass3.texture, acScreenNorm + fringeDir).r;
+float g = texture2DCv(pass3.texture, acScreenNorm).g;
+float b = texture2DCv(pass3.texture, acScreenNorm - fringeDir).b;
+float a = texture2DCv(pass3.texture, acScreenNorm).a;
+vec4 blurred = vec4(r, g, b, a);
+gl_FragColor = mix(orig, blurred, mix);
+}
+}]]></shader>
+</effect>

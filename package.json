@@ -1,0 +1,23 @@
+{
+  "name": "gold-motion-web",
+  "version": "8.5.1",
+  "description": "Gold Motion Web - Professional Motion Graphics & VFX Studio ported from Gold Motion APK",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js"
+  },
+  "keywords": [
+    "motion-graphics",
+    "video-editor",
+    "vfx",
+    "alight-motion",
+    "gold-motion",
+    "webgl",
+    "shaders"
+  ],
+  "author": "Gold Motion Team",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.3.0"
+  }
+}

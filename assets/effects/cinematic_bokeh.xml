@@ -1,0 +1,56 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.creative.cinematic_bokeh"
+name="Bokeh Blur"
+desc="High-quality bokeh blur with golden angle sampling and highlight gain."
+category="blur"
+tags="blur,bokeh,cinematic,camera"
+thumb="thumb/bokeh.webp">
+<params>
+<texture id="inputImg" srcType="content"/>
+<selector id="blurShape" style="dropdown" default="0" label="Bokeh Shape">
+<choice value="0" label="Circle" />
+<choice value="3" label="Triangle" />
+<choice value="4" label="Square" />
+<choice value="6" label="Hexagon" />
+</selector>
+<slider id="blurWidth" default="1.0" min="0.1" max="5.0" step="0.01" label="Blur Width" />
+<slider id="blurHeight" default="1.0" min="0.1" max="5.0" step="0.01" label="Blur Height" />
+<slider id="blurRadius" default="0.02" min="0.0" max="0.1" step="0.001" label="Blur Radius" />
+<slider id="highlightThreshold" default="0.5" min="0.0" max="1.0" step="0.01" label="Highlight Threshold" />
+<slider id="highlightGain" default="4.0" min="0.0" max="10.0" step="0.1" label="Highlight Intensity" />
+<spinner id="quality" default="48" min="8" max="128" step="8" label="Quality (Iterations)" />
+</params>
+<shader type="fragment" precision="high"><![CDATA[const float GOLDEN_ANGLE = 2.39996323;
+const float PI = 3.14159265;
+void main() {
+vec2 uv = acScreenNorm;
+float aspect = acScreenSize.x / acScreenSize.y;
+float r = blurRadius;
+float iterations = float(quality);
+vec3 acc = vec3(0.0);
+float tot = 0.0;
+float sides = float(blurShape);
+for (int i = 0; i < 128; i++)
+{
+if (float(i) >= iterations) break;
+float fi = float(i);
+float theta = fi * GOLDEN_ANGLE;
+float rad = sqrt(fi) / sqrt(iterations);
+if (sides > 2.5) {
+float deg = 2.0 * PI / sides;
+rad *= 1.0 / cos(mod(theta, deg) - deg * 0.5);
+}
+vec2 off = vec2(cos(theta), sin(theta));
+vec2 offset = off * rad * r;
+offset.x *= blurWidth / aspect;
+offset.y *= blurHeight;
+vec3 col = texture2DCv(inputImg.texture, uv + offset).rgb;
+float lum = dot(col, vec3(0.299, 0.587, 0.114));
+float weight = pow(max(0.0, (lum - highlightThreshold) / (1.0 - min(0.99, highlightThreshold))), highlightGain) + 0.01;
+acc += col * weight;
+tot += weight;
+}
+vec3 finalCol = acc / tot;
+gl_FragColor = vec4(finalCol, 1.0);
+}]]></shader>
+</effect>

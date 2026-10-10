@@ -1,0 +1,75 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.deep_glow_urp" name="Deep bloom" desc="URP/Deep Glow style bloom. Soft-knee threshold prefilter feeds a wide, smooth glow (spiral multi-tap that emulates a downsample/upsample pyramid) with Scatter for spread, plus Intensity, Tint, blend mode, quality and glow-only view. Matches Node Video's Bloom-based Glow." category="stylize" tags="glow,bloom,deep glow,scatter,threshold,light,soft,halation" thumb="thumb/pixelate.webp">
+<params>
+<texture id="inputImg" srcType="content" />
+<section text="Glow" />
+<spinner id="threshold" default="0.7"  min="0.0" max="1.0" step="0.001" label="Threshold" />
+<spinner id="softKnee"  default="0.5"  min="0.0" max="1.0" step="0.01"  label="Threshold Softness" type="percent" />
+<spinner id="radius"    default="0.15" min="0.0" max="0.6" step="0.001" label="Glow Radius" type="percent" />
+<spinner id="scatter"   default="0.7"  min="0.0" max="1.0" step="0.01"  label="Scatter (Spread)" type="percent" />
+<spinner id="intensity" default="1.2"  min="0.0" max="5.0" step="0.01"  label="Glow Intensity" />
+<section text="Color" />
+<color   id="glowColor" default="#FFFFFFFF" alpha="false" label="Glow Tint" />
+<selector id="blendMode" style="dropdown" default="0" label="Blend Mode">
+<choice value="0" label="Add" />
+<choice value="1" label="Screen" />
+<choice value="2" label="Lighten" />
+</selector>
+<section text="Output" />
+<selector id="quality" style="dropdown" default="2" label="Quality">
+<choice value="0" label="Low (24)" />
+<choice value="1" label="Medium (48)" />
+<choice value="2" label="High (64)" />
+</selector>
+<switch  id="glowOnly" default="false" label="Show Glow Only" />
+<spinner id="mixAmt"   default="1.0" min="0.0" max="1.0" step="0.01" label="Mix" type="percent" />
+</params>
+<shader type="fragment" precision="high"><![CDATA[vec3 samp(vec2 c){
+return texture2DCv(inputImg.texture, clamp(c, 0.0005, 0.9995)).rgb;
+}
+vec3 prefilter(vec3 c){
+float br = max(c.r, max(c.g, c.b));
+float knee = threshold * softKnee + 1e-4;
+float soft = br - threshold + knee;
+soft = clamp(soft, 0.0, 2.0 * knee);
+soft = soft * soft / (4.0 * knee);
+float contrib = max(soft, br - threshold);
+contrib /= max(br, 1e-4);
+return c * contrib;
+}
+void main(){
+vec2 res = acScreenSize;
+float aspect = res.x / max(1.0, res.y);
+vec2 uv = acScreenNorm;
+vec4 src = texture2DCv(inputImg.texture, uv);
+vec3 base = src.rgb;
+float samples = 64.0;
+if(quality == 0) samples = 24.0;
+else if(quality == 1) samples = 48.0;
+float k = mix(7.0, 1.2, scatter);
+float golden = 2.39996323;
+vec3 sum = vec3(0.0);
+float wsum = 0.0;
+for(int i = 0; i < 64; i++){
+if(float(i) >= samples) break;
+float fi = float(i);
+float t = (fi + 0.5) / samples;
+float r = sqrt(t);
+float ang = fi * golden;
+vec2 off = vec2(cos(ang), sin(ang)) * r * radius;
+off.x /= aspect;
+float w = exp(-r * r * k);
+sum += prefilter(samp(uv + off)) * w;
+wsum += w;
+}
+vec3 glow = sum / max(wsum, 1e-4);
+glow *= intensity * glowColor.rgb;
+vec3 outc;
+if(blendMode == 0)      outc = base + glow;
+else if(blendMode == 1) outc = 1.0 - (1.0 - base) * (1.0 - clamp(glow, 0.0, 1.0));
+else                    outc = max(base, glow);
+if(glowOnly) outc = glow;
+outc = mix(base, outc, mixAmt);
+gl_FragColor = vec4(outc, src.a);
+}]]></shader>
+</effect>

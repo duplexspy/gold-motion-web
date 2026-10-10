@@ -1,0 +1,50 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect
+id="com.alightcreative.effects.2Dtunnelv2"
+name="2DTunnel V2"
+desc="Amazing New Extra FX from the Modder"
+category="procedural"
+tags="other"
+thumb="thumb/SKEXNXX/tunnelv2.webp"
+experimental="false">
+<params>
+<color id="color1" default="#FF000000" label="Color BG" alpha="true" />
+<color id="color2" default="#FF00FFFF" label="Color FG" alpha="true" />
+<switch id="autop" default="true" label="Auto Progress" />
+<switch id="newpath" default="false" label="Sinus Pattern" />
+<spinner id="PROGRESS" label="Progress" default="1.0" min="-100.0" max="100.0" step="0.01" type="percent" />
+<spinner id="SPEED" label="Speed" default="0.4" min="0.0" max="100.0" step="0.01" type="percent" />
+<point id="position" label="Position" />
+<spinner id="xxj" label="Sharpen" default="2.5" min="0.0" max="100.0" step="0.01" type="percent" />
+<spinner id="xxg" label="Thickness V1" default="0.12" min="0.0" max="100.0" step="0.01" type="percent" />
+<spinner id="xxi" label="Thicknes V2" default="0.12" min="0.0" max="100.0" step="0.01" type="percent" />
+<spinner id="xxe" label="Amount Grid" default="5" min="0.0" max="50.0" step="0.5" />
+<spinner id="xxc" label="Circular Grid" default="0.25" min="0.0" max="100.0" step="0.01" type="percent" />
+<spinner id="xxd" label="Rotate Grid" default="1.2" min="0.0" max="100.0" step="0.01" type="percent" />
+<spinner id="xxb" label="Grid Z" default="0" min="0.0" max="100.0" step="0.01" type="percent" />
+<point id="xxx" default="4.0, 4.0" min="-10., -10." max="10, 10" label="Factor" step="0.01" />
+<spinner id="scale" default="1.0" min="0.1" max="50.0" step="0.01" label="Scale" type="percent" />
+<spinner id="angle" default="0.0" min="-3600" max="3600" ticks="-180,-135,-90,-45,-30,-15,0,15,30,45,90,135,180" label="Rotate" step="0.5" type="angle" />
+<point id="stretch" default="1.0,1.0" min="0.01,0.01" max="10, 10" label="@am:string/effect_param_stretch" step="0.01" />
+<spinner id="alpha" default="1.0" min="0.0" max="1.0" step="0.01" label="Alpha" type="percent" />
+<spinner id="hardness" default="1.0" min="1.0" max="3.0" step="0.01" label="Hard/Brightness" type="percent" />
+<selector id="blendMode" style="radio" default="3">
+<choice label="NORMAL" value="0" />
+<choice label="LAYER" value="3" />
+<choice label="MULTIPLY" value="1" />
+<choice label="SCREEN" value="2" />
+</selector>
+<texture id="inputImg" srcType="content" />
+<texture id="xcipher" srcType="buffer" />
+</params>
+<iterations param="iter" /> <passes> <pass target="xcipher" effect="636f6d2e616c6967687463726561746976652e656666656374732e324474756e6e656c7632"/> <pass /> </passes> <shader type="fragment" precision="high"><![CDATA[void main ()
+{
+const vec3 luminance = vec3(0.2126, 0.7152, 0.0722); float phiQuarter = 90.0 * 0.0174533; float enchantDecryption = 8.0;
+float keyDecryptSyamjaiDtz = 0.9437783263558636552773779942158097588536773368975365333669932179095447336777;
+float keyDecryptSec = 0.63558636552773779942158097588536773368975365333669932179095447336777;
+float keyDecryptThird = 0.73779942158097588536773368975365333669932179095447336777;
+keyDecryptSyamjaiDtz = 1.0;
+vec4 DecodingFX = texture2DCv(xcipher.texture,acScreenNorm)*keyDecryptSyamjaiDtz;
+gl_FragColor = DecodingFX;
+}]]></shader>
+</effect>

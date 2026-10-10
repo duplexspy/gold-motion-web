@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect id="com.gmfx.effects.digitalcollapse" name="GM Digital Collapse" desc="Columns of the image fall away with ghosting trails like a crumbling digital signal" category="distort" tags="collapse,crumble,digital,fall,glitch" overdraw="false" thumb="thumb/gm/gmdigitalcollapse.webp">
+<params>
+<texture id="inputImg" srcType="content"/>
+<section text="COLLAPSE"/>
+<spinner id="collapseAmt" default="50.0" min="0.0" max="100.0" step="1.0" label="Collapse Progress" type="percent"/>
+<spinner id="colWidth" default="14.0" min="2.0" max="60.0" step="1.0" label="Column Width (px)"/>
+<spinner id="fallSpeed" default="1.0" min="0.0" max="5.0" step="0.05" label="Fall Speed"/>
+<spinner id="fallGap" default="0.5" min="0.0" max="3.0" step="0.05" label="Start Delay Spread"/>
+<section text="DEBRIS"/>
+<spinner id="trailEcho" default="0.55" min="0.0" max="1.0" step="0.01" label="Ghost Trail" type="percent"/>
+<spinner id="fallStagger" default="0.7" min="0.0" max="1.0" step="0.01" label="Column Randomness" type="percent"/>
+<spinner id="collapseSeed" default="0.0" min="0.0" max="100.0" step="1.0" label="Seed"/>
+</params>
+<shader type="fragment" precision="high"><![CDATA[float gmHash2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+void main(){
+vec2 uv = acScreenNorm;
+vec4 src = texture2DCv(inputImg.texture, uv);
+float szX = getTexSize(inputImg.size).x;
+float cw = max(colWidth, 2.0);
+float colId = floor(uv.x * szX / cw);
+float h = gmHash2(vec2(colId, collapseSeed));
+float start = h * fallGap * 0.6;
+float localT = clamp((collapseAmt * 0.01 * (1.0 + fallGap) - start) * fallSpeed * 2.0, 0.0, 1.0);
+float dist = localT * (0.55 + 0.45 * fallStagger * gmHash2(vec2(colId * 1.3, collapseSeed + 7.0)));
+dist = pow(dist, 0.8);
+float shift = dist * dist * 1.6;
+vec2 suv = vec2(uv.x, uv.y - shift);
+vec4 col;
+if (suv.y < 0.0) {
+float echoUv = fract(suv.y * 0.6);
+col = texture2DCv(inputImg.texture, clamp(vec2(uv.x, echoUv * 0.2), 0.0, 1.0));
+col.rgb *= trailEcho * 0.35 * (1.0 - dist * 0.6);
+col.a *= trailEcho * dist * 0.5;
+} else {
+col = texture2DCv(inputImg.texture, clamp(suv, 0.0, 1.0));
+if (trailEcho > 0.01 && dist > 0.01) {
+vec4 ghost = texture2DCv(inputImg.texture, clamp(vec2(uv.x, uv.y - shift * 0.55), 0.0, 1.0));
+col.rgb = mix(col.rgb, ghost.rgb, trailEcho * 0.4 * smoothstep(0.0, 0.4, dist));
+}
+}
+gl_FragColor = vec4(col.rgb, col.a);
+}]]></shader>
+</effect>

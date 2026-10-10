@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect id="com.gmfx.effects.nightvision" name="GM Night Vision Goggles" desc="Green phosphor night vision with gain, bloom, scanlines and sensor noise" category="color" tags="nightvision,military,green,surveillance,spy" overdraw="false" thumb="thumb/gm/gmnightvision.webp">
+<params>
+<texture id="inputImg" srcType="content"/>
+<section text="TUBE"/>
+<spinner id="gain" default="2.2" min="0.5" max="8.0" step="0.05" label="Gain"/>
+<spinner id="lift" default="0.08" min="0.0" max="0.5" step="0.01" label="Black Lift"/>
+<color id="phosphor" default="#7CFF3F" label="Phosphor" alpha="false"/>
+<spinner id="bloomAmt" default="0.5" min="0.0" max="1.0" step="0.01" label="Bloom" type="percent"/>
+<section text="SENSOR"/>
+<spinner id="noiseAmt" default="0.30" min="0.0" max="1.0" step="0.01" label="Noise" type="percent"/>
+<spinner id="scanAmt" default="0.25" min="0.0" max="1.0" step="0.01" label="Scanlines" type="percent"/>
+<spinner id="vigAmt" default="0.65" min="0.0" max="1.0" step="0.01" label="Tube Vignette" type="percent"/>
+<switch id="borderMask" default="true" label="Round Tube Mask"/>
+</params>
+<shader type="fragment" precision="high"><![CDATA[float gmHash2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+float gmLum(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+void main(){
+vec2 uv = acScreenNorm;
+vec4 src = texture2DCv(inputImg.texture, uv);
+float lum = gmLum(src.rgb) * gain + lift;
+float bl = 0.0;
+vec2 px = 2.5 / getTexSize(inputImg.size);
+bl += gmLum(texture2DCv(inputImg.texture, uv + vec2(px.x, 0.0)).rgb);
+bl += gmLum(texture2DCv(inputImg.texture, uv - vec2(px.x, 0.0)).rgb);
+bl += gmLum(texture2DCv(inputImg.texture, uv + vec2(0.0, px.y)).rgb);
+bl += gmLum(texture2DCv(inputImg.texture, uv - vec2(0.0, px.y)).rgb);
+bl += gmLum(texture2DCv(inputImg.texture, uv + px).rgb);
+bl += gmLum(texture2DCv(inputImg.texture, uv - px).rgb);
+bl += gmLum(texture2DCv(inputImg.texture, uv + vec2(px.x, -px.y)).rgb);
+bl += gmLum(texture2DCv(inputImg.texture, uv + vec2(-px.x, px.y)).rgb);
+bl = (bl * 0.125) * gain + lift;
+lum = lum + (max(bl - lum, 0.0)) * bloomAmt * 0.9;
+float tube = 1.0 - exp(-lum * 1.4);
+vec3 col = phosphor.rgb * tube;
+float scan = sin(uv.y * getTexSize(inputImg.size).y * 3.14159);
+col *= 1.0 - scanAmt * 0.5 * (0.5 + 0.5 * scan);
+float n = gmHash2(uv * getTexSize(inputImg.size) + fract(acTime) * 91.7);
+col += (n - 0.5) * noiseAmt * 0.5;
+vec2 c = uv - 0.5;
+float r = length(c * vec2(1.0, 0.92));
+col *= 1.0 - vigAmt * 0.9 * smoothstep(0.35, 0.78, r);
+if (borderMask) {
+col *= 1.0 - smoothstep(0.72, 0.80, r);
+}
+gl_FragColor = vec4(col * src.a, src.a);
+}]]></shader>
+</effect>

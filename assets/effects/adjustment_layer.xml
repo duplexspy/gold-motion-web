@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect
+id="com.alightcreative.effects.adjustment_layer"
+name="Adjustment Layer"
+desc="Captures the background into the layer, allowing subsequent effects (like Shake) to transform the background content."
+category="color"
+tags="color,composite,adjustment,background"
+thumb="thumb/adjustmentlayer.webp">
+<params>
+<texture id="inputImg" srcType="content" />
+<texture id="comp" srcType="comp" />
+</params>
+<shader type="fragment" precision="high"><![CDATA[void main(){
+vec4 bg = texture2DCv(comp.texture, acLayerNorm);
+gl_FragColor = bg;
+}]]></shader>
+</effect>

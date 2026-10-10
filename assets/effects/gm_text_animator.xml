@@ -1,0 +1,76 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.goldmotion.effects.aetextbounce"
+name="GM Text Animator"
+desc="A real per-character text animator running inside the native glyph engine. Every character (or word, or line) is given its own 0 to 1 progress and that progress is pushed through the animation CURVE you choose from the Animation Type dropdown. Because the curve is evaluated per component you get staggered, springy, overshooting and bouncing motion from a single effect - no expression graph, no elastic setup, no manual keyframing. Bounce In drops the line in and lets each character settle with decaying bounces; Bounce Out tears it away; Elastic and Spring wobble; Back overshoots once; Wave and Pulse keep moving forever; Smooth Settle and Expo Snap give clean professional landings. Offset, Angle, Scale, Stretch and Alpha are the AMPLITUDE of the motion - the curve only decides HOW the component travels along it. Frequency sets how many bounces or wobbles happen, Damping how fast they die out, Overshoot how hard they hit. Apply To switches the whole animator between letters, words, lines or the whole block."
+category="text"
+tags="gm,text,animator,kinetic,bounce,elastic,spring,wave,preset,stagger,letters,words"
+affinity="text!" type="text"
+experimental="false"
+thumb="thumb/gm_text_animator.webp">
+<params>
+<section text="Animation Type" />
+<selector id="gmPreset" style="dropdown" default="1" label="Animation Type">
+<choice value="0" label="None - Use Easing Only" />
+<choice value="1" label="Bounce In" />
+<choice value="2" label="Bounce Out" />
+<choice value="3" label="Elastic" />
+<choice value="4" label="Back - Single Overshoot" />
+<choice value="5" label="Spring - Jelly" />
+<choice value="6" label="Wave - Endless Sway" />
+<choice value="7" label="Pulse - Heartbeat" />
+<choice value="8" label="Wobble - Decay" />
+<choice value="9" label="Smooth Settle" />
+<choice value="10" label="Expo Snap" />
+<choice value="11" label="Rubber Band" />
+<choice value="12" label="Double Bounce" />
+</selector>
+<spinner id="gmFreq" default="2.0" min="0.25" max="12.0" step="0.05" label="Frequency - Bounces / Wobbles" />
+<spinner id="gmDamping" default="0.35" min="0.0" max="1.0" step="0.01" type="percent" label="Damping - How Fast It Dies" ticks="0.0,0.5,1.0" />
+<spinner id="gmOvershoot" default="1.0" min="0.0" max="3.0" step="0.01" label="Overshoot - Strength" ticks="0.0,1.0,2.0" />
+<selector id="gmDirection" style="dropdown" default="0" label="Direction">
+<choice value="0" label="Forward" />
+<choice value="1" label="Backward" />
+</selector>
+<section text="Apply To" />
+<selector id="component" style="dropdown" default="1" label="Words or Letters">
+<choice value="0" label="Whole Text" />
+<choice value="1" label="Letters" />
+<choice value="2" label="Words" />
+<choice value="3" label="Lines" />
+</selector>
+<section text="Motion Amount" />
+<point id="offset" default="0.0,-150.0" label="Offset" />
+<spinner id="angle" default="0.0" min="-1800.0" max="1800.0" type="angle" step="0.1" label="Angle" ticks="-90,-45,0,45,90" snap="-90,-45,0,45,90" />
+<spinner id="scale" default="0.0" min="-1.0" max="10.0" step="0.01" label="Scale" ticks="0.0" />
+<spinner id="stretch" default="0.0" min="-1.0" max="10.0" step="0.01" label="Stretch" ticks="0.0" />
+<spinner id="alpha" default="0" min="-1" max="1" step="0.001" label="Alpha" ticks="0.0" />
+<spinner id="gmHold" default="0.0" min="0.0" max="0.9" step="0.01" type="percent" label="Hold At End" ticks="0.0,0.5" />
+<spinner id="gmSecondary" default="0.0" min="0.0" max="2.0" step="0.01" label="Secondary Wobble" ticks="0.0,1.0" />
+<section text="Range And Stagger" />
+<spinner id="start" default="0.0" min="0.0" max="1.0" type="percent" step="0.001" label="Start" ticks="0.0,0.5,1.0" />
+<spinner id="end" default="1.0" min="0.0" max="1.0" type="percent" step="0.001" label="End" ticks="0.0,0.5,1.0" />
+<spinner id="overlap" default="0.0" min="0.0" max="10.0" step="0.01" type="percent" label="Stagger - Overlap" />
+<spinner id="phase" default="0.0" min="-1.0" max="2.0" type="percent" step="0.001" label="Stagger Phase" ticks="-1.0,0.0,1.0" />
+<selector id="shape" style="dropdown" default="1" label="Window Shape">
+<choice value="0" label="Square - Hard Cut" />
+<choice value="1" label="Smooth" />
+<choice value="2" label="Triangle" />
+<choice value="3" label="Ramp" />
+</selector>
+<spinner id="gmPhase" default="0.0" min="-1.0" max="1.0" step="0.001" label="Curve Phase" ticks="-1.0,0.0,1.0" />
+<section text="Order" />
+<switch id="randomOrder" default="false" label="Random Order" />
+<spinner id="seed" default="0.0" min="0.0" max="25.0" step="0.01" label="Seed" />
+<section text="Easing" />
+<slider id="easeIn" default="0" min="-4" max="4" step="0.01" type="percent" label="Ease In" snap="0" ticks="0" />
+<slider id="easeOut" default="0" min="-4" max="4" step="0.01" type="percent" label="Ease Out" snap="0" ticks="0" />
+<section text="Anchor And Colour" />
+<selector id="anchor" style="dropdown" default="1" label="Anchor">
+<choice value="0" label="Layer" />
+<choice value="1" label="Component" />
+</selector>
+<switch id="useFillColor" default="false" label="Override Fill Colour" />
+<color id="fillColor" default="#FF00FF00" label="Fill Colour" alpha="false" />
+<section text="MOD BY PNKJ" />
+</params>
+</effect>

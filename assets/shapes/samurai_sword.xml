@@ -1,0 +1,75 @@
+<shape id="com.alightcreative.shapes.samurai_sword" name="Samurai Sword">
+
+    <params>
+        <point id="size" label="@am:string/effect_param_size" default="500,20" type="size" />
+        <spinner id="guard" min="0" max="400" default="40" step="1" label="Guard" />
+        <spinner id="handle" min="0" max="1000" default="150" step="1" label="Handle" />
+        <spinner id="tip" min="0" max="400" default="30" step="1" label="Tip" />
+    </params>
+
+    <handle id="e" param="size" type="x" />
+    <handle id="w" param="size" type="x" invert="x" />
+    <handle id="n" param="size" type="y" invert="y" />
+    <handle id="s" param="size" type="y" />
+
+    <script lang="js"><![CDATA[
+        function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+
+        function getHandles(params) {
+            return {
+                n: [0, -params.size.y],
+                s: [0, params.size.y],
+                e: [params.size.x, 0],
+                w: [-params.size.x, 0]
+            }
+        }
+
+        // Sword is drawn horizontally, centered at origin.
+        // Left side = pommel end of handle, right side = blade tip.
+        function getPath(params) {
+            let L = params.size.x;      // half total length span for main body (blade+some)
+            let H = params.size.y;      // half thickness
+            let guard = clamp(params.guard, 0, L*2);
+            let handle = clamp(params.handle, 0, L*2);
+            let tip = clamp(params.tip, 0, L*2);
+
+            // Effective placements
+            let left = -L - handle;         // end of handle (pommel)
+            let guardCenter = -L + guard;   // guard region near blade root
+            let bladeRoot = -L;             // start of blade
+            let right = L;                  // near tip start
+            let tipLen = tip;               // triangular tip length
+
+            // guard height protrudes a bit beyond body thickness
+            let guardH = H * 1.6;
+            let handleH = H * 0.8;          // handle slightly thinner than blade body
+
+            // Path outline (clockwise) starting from top of pommel moving to tip
+            // Segments: handle -> guard -> blade -> tip triangle -> back along bottom
+            let topHandleY = -handleH;
+            let botHandleY = handleH;
+            let topBladeY = -H;
+            let botBladeY = H;
+
+            return [
+                // Top edge from left to right
+                [left, topHandleY],                          // pommel top
+                [bladeRoot - handle*0.2, topHandleY],        // handle section
+                [guardCenter - guard*0.5, -guardH],          // left flare of guard
+                [guardCenter + guard*0.5, -guardH],          // right flare of guard
+                [bladeRoot + guard*0.6, topBladeY],          // transition to blade thickness
+                [right - tipLen, topBladeY],                 // approach tip start
+                [right, 0],                                  // tip point
+                // Bottom edge returning leftwards
+                [right - tipLen, botBladeY],
+                [bladeRoot + guard*0.6, botBladeY],
+                [guardCenter + guard*0.5, guardH],
+                [guardCenter - guard*0.5, guardH],
+                [bladeRoot - handle*0.2, botHandleY],
+                [left, botHandleY],
+                {closed:true}
+            ];
+        }
+    ]]></script>
+
+</shape>

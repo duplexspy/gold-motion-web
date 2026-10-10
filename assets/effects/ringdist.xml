@@ -1,0 +1,47 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.ring_distortion_fade"
+name="Ring Distortion Fade"
+desc="Animated radial band that distorts pixels toward the center; fades strength over time."
+category="distort"
+tags="distort,transition,radial,fade,ripple"
+thumb="thumb/ringdiest.webp"
+experimental="false">
+<params>
+<texture id="inputImg" srcType="content" label="Layer" />
+<section text="Timing" />
+<switch id="autoTime" default="true" label="Auto Time (use clip time)" />
+<spinner id="duration" default="1.0" min="0.05" max="20.0" step="0.01" label="Effect Duration (s)" />
+<slider id="progress" default="0.0" min="0.0" max="1.0" step="0.001" label="Progress (manual when Auto Time off)" />
+<section text="Band" />
+<spinner id="effectWidth" default="0.4" min="0.01" max="1.0" step="0.001" label="Band Width" />
+<spinner id="fadeInTimeFactor" default="0.5" min="0.0" max="1.0" step="0.001" label="Fade-In Time Factor" />
+<spinner id="maxTexelOffset" default="20.0" min="0.0" max="200.0" step="0.1" label="Max Texel Offset" />
+<section text="Center" />
+<spinner id="centerX" default="0.5" min="0.0" max="1.0" step="0.001" label="Center X" />
+<spinner id="centerY" default="0.5" min="0.0" max="1.0" step="0.001" label="Center Y" />
+<tip text="Enable Auto Time to loop across Duration, or keyframe Progress 0→1. Band width controls ring thickness; Max Texel Offset controls strength." />
+</params>
+<shader type="fragment" precision="high"><![CDATA[void main(){
+vec2 res = acScreenSize;
+vec2 uv = acScreenNorm;
+float pr = autoTime ? mod(acTime, duration) / max(0.0001, duration) : clamp(progress, 0.0, 1.0);
+vec2 center = vec2(centerX, centerY);
+float minDim = min(res.x, res.y);
+vec2 offsetFromCenter = (uv - center) * res / max(1.0, minDim);
+float lenO = length(offsetFromCenter);
+vec2 offsetDir = lenO > 1e-6 ? normalize(-offsetFromCenter) : vec2(0.0);
+float halfWidth = effectWidth * 0.5;
+float lower = 1.0 - smoothstep(pr - halfWidth, pr, lenO);
+float upper = smoothstep(pr, pr + halfWidth, lenO);
+float band = 1.0 - (upper + lower);
+float strength = 1.0 - pr;
+float fadeStrength = smoothstep(0.0, fadeInTimeFactor, pr);
+float distortion = band * strength * fadeStrength;
+vec2 texelSize = 1.0 / inputImg.size;
+vec2 uvOff = uv + texelSize * (offsetDir * maxTexelOffset * distortion);
+vec2 halfTex = texelSize * 0.5;
+uvOff = clamp(uvOff, halfTex, 1.0 - halfTex);
+vec4 col = texture2DCv(inputImg.texture, uvOff);
+gl_FragColor = col;
+}]]></shader>
+</effect>

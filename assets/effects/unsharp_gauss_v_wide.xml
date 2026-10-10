@@ -1,0 +1,31 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<effect id="com.alightcreative.effects.unsharp_gauss_v_wide" name="Unsharp Gaussian V (Wide)" category="blur" internal="true">
+<params>
+<texture id="inputImg" srcType="content" />
+<spinner id="wideRadius" default="6.0" min="0.5" max="100.0" step="0.1" label="Wide Radius" />
+<selector id="quality" default="1" style="dropdown" label="Quality">
+<choice label="Fast" value="0" />
+<choice label="Normal" value="1" />
+<choice label="High" value="2" />
+</selector>
+</params>
+<shader type="fragment" precision="high"><![CDATA[vec4 s(vec2 uv){ return texture2DCv(inputImg.texture, uv); }
+float w(float x, float sigma){ return exp(-(x*x)/(2.0*sigma*sigma)); }
+void main(){
+vec2 uv = acScreenNorm;
+vec2 texel = 1.0/inputImg.size;
+float r = wideRadius;
+if(r<=0.0){ gl_FragColor = s(uv); return; }
+int taps = int(r * (quality==0?2.0:(quality==1?3.0:4.0)));
+float sigma = max(0.0001, r*0.6);
+vec4 acc = vec4(0.0);
+float wsum = 0.0;
+for(int i=-2048;i<=2048;i++){
+if(i<-taps) continue; if(i>taps) break;
+float wi = w(float(i), sigma);
+acc += s(uv + vec2(0.0, float(i)*texel.y)) * wi;
+wsum += wi;
+}
+gl_FragColor = acc/max(0.0001,wsum);
+}]]></shader>
+</effect>

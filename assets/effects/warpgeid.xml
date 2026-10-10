@@ -1,0 +1,42 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect
+id="com.alightcreative.effects.warpedGrid"
+name="Warped Grid"
+desc="A rotating and zooming grid texture with an optional warp effect."
+category="procedural"
+tags="grid,warp,rotozoom,texture,motion"
+thumb="thumb/warpedgrid.webp"
+experimental="false">
+<params>
+<spinner id="gridSize" label="Grid Size" default="20.0" min="5.0" max="100.0" step="1.0" />
+<spinner id="rotationSpeed" label="Rotation Speed" default="0.5" min="-2.0" max="2.0" step="0.05" />
+<spinner id="zoomSpeed" label="Zoom Speed" default="0.2" min="-1.0" max="1.0" step="0.01" />
+<spinner id="warpAmount" label="Warp Amount" default="0.1" min="0.0" max="1.0" step="0.01" />
+<spinner id="warpFrequency" label="Warp Freq." default="5.0" min="1.0" max="20.0" step="0.1" />
+<color id="gridColor" label="Grid Color" default="#1a3d54" />
+<color id="bgColor" label="Background Color" default="#00091c" />
+</params>
+<shader type="fragment" precision="high"><![CDATA[mat2 rotate2d(float angle){
+return mat2(cos(angle), -sin(angle),
+sin(angle), cos(angle));
+}
+void main() {
+vec2 uv = acLayerNorm;
+uv -= 0.5;
+uv.x *= acLayerSize.x / acLayerSize.y;
+float time = acTime;
+float zoom = exp(time * zoomSpeed);
+float angle = time * rotationSpeed;
+uv = rotate2d(angle) * uv;
+uv *= zoom;
+uv.x += sin(uv.y * warpFrequency + time * 0.5) * warpAmount;
+uv.y += cos(uv.x * warpFrequency - time * 0.3) * warpAmount;
+vec2 grid = fract(uv * gridSize);
+float lineWidth = 0.05;
+float lineX = step(1.0 - lineWidth, grid.x) + step(lineWidth, grid.x) * step(grid.x, lineWidth);
+float lineY = step(1.0 - lineWidth, grid.y) + step(lineWidth, grid.y) * step(grid.y, lineWidth);
+float isGridLine = min(lineX + lineY, 1.0);
+vec3 finalColor = mix(bgColor.rgb, gridColor.rgb, isGridLine);
+gl_FragColor = vec4(finalColor, 1.0);
+}]]></shader>
+</effect>

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect id="com.gmfx.effects.privacy" name="GM Privacy Mosaic" desc="Clean pixelation censor with full-frame or circular region modes and soft mask edge" category="stylize" tags="mosaic,pixelate,censor,privacy,blur" overdraw="false" thumb="thumb/gm/gmprivacy.webp">
+<params>
+<texture id="inputImg" srcType="content"/>
+<section text="MOSAIC"/>
+<spinner id="tileSize" default="22.0" min="2.0" max="120.0" step="1.0" label="Tile Size (px)"/>
+<spinner id="tileRound" default="0.35" min="0.0" max="1.0" step="0.01" label="Tile Rounding" type="percent"/>
+<spinner id="mosaicMix" default="100.0" min="0.0" max="100.0" step="1.0" label="Strength" type="percent"/>
+<section text="REGION"/>
+<selector id="regionMode" style="dropdown" default="1" label="Region">
+<choice label="Full Frame" value="1"/>
+<choice label="Circle" value="2"/>
+<choice label="Outside Circle" value="3"/>
+</selector>
+<spinner id="maskCX" default="50.0" min="0.0" max="100.0" step="0.5" label="Center X" type="percent"/>
+<spinner id="maskCY" default="50.0" min="0.0" max="100.0" step="0.5" label="Center Y" type="percent"/>
+<spinner id="maskR" default="25.0" min="2.0" max="80.0" step="0.5" label="Radius" type="percent"/>
+<spinner id="maskFeather" default="8.0" min="0.0" max="40.0" step="0.5" label="Edge Feather" type="percent"/>
+</params>
+<shader type="fragment" precision="high"><![CDATA[float gmHash2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+void main(){
+vec2 uv = acScreenNorm;
+vec4 src = texture2DCv(inputImg.texture, uv);
+vec2 lp = acLayerNorm;
+vec2 sz = max(acLayerSize, vec2(1.0));
+float tile = max(tileSize, 2.0);
+vec2 tuv = (floor(lp * sz / tile) + 0.5) * tile / sz;
+tuv = clamp(tuv, 0.5 / sz, 1.0 - 0.5 / sz);
+vec4 mos = texture2DCv(inputImg.texture, (vec4(tuv, 0.0, 1.0) * acLayerToScreen).xy);
+// Source textures are premultiplied. Keep the original layer's coverage.
+mos.rgb = clamp(mos.rgb / max(mos.a, 1e-4), 0.0, 1.0) * src.a;
+if (tileRound > 0.001) {
+vec2 f = fract(lp * sz / tile) - 0.5;
+float dd = length(max(abs(f) - (0.5 - tileRound * 0.28), 0.0)) / max(tileRound * 0.28, 0.001);
+mos = mix(mos, src, clamp(dd, 0.0, 1.0) * tileRound);
+}
+float mask = 1.0;
+float mf = float(regionMode);
+if (mf > 1.5) {
+float aspect = sz.x / sz.y;
+float d = length((lp - vec2(maskCX * 0.01, maskCY * 0.01)) * vec2(aspect, 1.0));
+float r = maskR * 0.01;
+float fe = max(maskFeather * 0.01, 0.001);
+float inside = 1.0 - smoothstep(r - fe, r, d);
+mask = (mf < 2.5) ? inside : 1.0 - inside;
+}
+vec3 col = mix(src.rgb, mos.rgb, clamp(mosaicMix * 0.01 * mask, 0.0, 1.0));
+gl_FragColor = vec4(col, src.a);
+}]]></shader>
+</effect>

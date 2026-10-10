@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect id="com.gmfx.effects.lomodream" name="GM Lomo Dream" desc="Lomography dream look: punchy saturation, hard vignette and dreamy edge chroma" category="color" tags="lomo,lomography,vignette,dream,analog" overdraw="false" thumb="thumb/gm/gmlomodream.webp">
+<params>
+<texture id="inputImg" srcType="content"/>
+<section text="LOMO"/>
+<spinner id="lomoSat" default="1.35" min="0.0" max="2.5" step="0.01" label="Saturation"/>
+<spinner id="lomoContrast" default="1.2" min="0.5" max="2.2" step="0.01" label="Contrast"/>
+<spinner id="lomoCurve" default="0.35" min="0.0" max="1.0" step="0.01" label="Punch" type="percent"/>
+<section text="VIGNETTE"/>
+<spinner id="lomoVig" default="0.75" min="0.0" max="1.0" step="0.01" label="Vignette" type="percent"/>
+<spinner id="lomoVigHard" default="0.35" min="0.0" max="1.0" step="0.01" label="Vignette Hardness" type="percent"/>
+<section text="DREAM"/>
+<spinner id="edgeChroma" default="0.4" min="0.0" max="1.0" step="0.01" label="Edge Chroma" type="percent"/>
+<spinner id="warmEdge" default="0.3" min="0.0" max="1.0" step="0.01" label="Warm Edges" type="percent"/>
+</params>
+<shader type="fragment" precision="high"><![CDATA[float gmLum(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+void main(){
+vec2 uv = acScreenNorm;
+vec4 src = texture2DCv(inputImg.texture, uv);
+float l = gmLum(src.rgb);
+vec3 c = mix(vec3(l), src.rgb, lomoSat);
+c = clamp((c - 0.5) * lomoContrast + 0.5, 0.0, 1.0);
+float k = lomoCurve;
+c = mix(c, c * c * (3.0 - 2.0 * c), k);
+float r = length(uv - 0.5);
+float ch = edgeChroma * smoothstep(0.15, 0.62, r) * 0.006;
+if (ch > 0.0001) {
+vec2 dir = normalize(uv - 0.5 + 1e-5);
+c.r = texture2DCv(inputImg.texture, uv + dir * ch).r;
+c.b = texture2DCv(inputImg.texture, uv - dir * ch).b;
+}
+float softV = smoothstep(0.12, 0.95, r);
+float hardV = smoothstep(0.3, 0.62, r);
+float vig = mix(softV, hardV, lomoVigHard);
+c *= 1.0 - lomoVig * vig;
+c = mix(c, c * vec3(1.06, 0.99, 0.9), warmEdge * vig);
+gl_FragColor = vec4(clamp(c, 0.0, 1.0) * src.a, src.a);
+}]]></shader>
+</effect>

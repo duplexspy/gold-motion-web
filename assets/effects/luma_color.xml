@@ -1,0 +1,48 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.color_luma_key"
+name="Color-Luma Key"
+desc="Remove a selected color with luminance-aware keying"
+category="matte"
+tags="key,luma,chroma,matte,remove,color"
+thumb="thumb/colorlumakey.webp">
+<params>
+<texture id="inputImg" srcType="content" />
+<section text="Key" />
+<color id="keyColor" default="#FF00FF00" label="Color to Remove" alpha="false" />
+<spinner id="tolerance" default="0.20" min="0.0" max="1.0" step="0.001" label="Tolerance" />
+<spinner id="softness" default="0.10" min="0.0" max="1.0" step="0.001" label="Softness" />
+<spinner id="lumaWeight" default="0.30" min="0.0" max="1.0" step="0.01" label="Luma Weight" />
+<switch id="invertKey" default="false" label="Invert (Keep keyed color)" />
+<section text="Despill" />
+<spinner id="despill" default="0.20" min="0.0" max="1.0" step="0.01" label="Despill Amount" />
+<section text="Output" />
+<spinner id="alpha" default="1.0" min="0.0" max="1.0" step="0.01" label="Alpha" type="percent" />
+</params>
+<shader type="fragment" precision="high"><![CDATA[const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
+vec2 chroma(vec3 c){
+float y = dot(c, LUMA);
+return vec2(c.b - y, c.r - y);
+}
+void main(){
+vec2 uv = acScreenNorm;
+vec4 src = texture2DCv(inputImg.texture, uv);
+vec3 c = src.rgb;
+vec3 k = keyColor.rgb;
+float y  = dot(c, LUMA);
+float yk = dot(k, LUMA);
+vec2 cc = chroma(c);
+vec2 ck = chroma(k);
+float chromaDist = length(cc - ck);
+float lumaDist   = abs(y - yk);
+float d = chromaDist + lumaWeight * lumaDist;
+float t = tolerance;
+float s = max(softness, 1e-5);
+float matte = 1.0 - smoothstep(t - s, t + s, d);
+if(invertKey) matte = 1.0 - matte;
+float match = matte;
+vec3 neutral = vec3(y);
+vec3 cDespill = mix(c, mix(c, neutral, 0.6), despill * match);
+float aOut = src.a * (1.0 - matte) * alpha;
+gl_FragColor = vec4(cDespill, 1.0) * aOut;
+}]]></shader>
+</effect>

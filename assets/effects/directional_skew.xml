@@ -1,0 +1,27 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.creative.directional_skew"
+name="Directional Skew"
+desc="Applies a directional shear/skew effect based on a scale and angle."
+category="distort"
+tags="distort,skew,shear,warp"
+thumb="thumb/skew.webp">
+<params>
+<texture id="inputImg" srcType="content"/>
+<spinner id="skewScale" default="0.5" min="-2.0" max="2.0" step="0.01" label="Skew Scale" />
+<spinner id="skewAngle" default="0.0" min="-180.0" max="180.0" step="1.0" label="Skew Angle" />
+</params>
+<shader type="fragment" precision="high"><![CDATA[void main() {
+vec2 uv = acScreenNorm;
+vec2 centered = uv - acLayerCenterNorm;
+float rad = radians(skewAngle);
+float c = cos(rad);
+float s = sin(rad);
+mat2 toSkewAxis = mat2(c, -s, s, c);
+mat2 fromSkewAxis = mat2(c, s, -s, c);
+vec2 temp = centered * toSkewAxis;
+temp.x += temp.y * skewScale;
+centered = temp * fromSkewAxis;
+uv = centered + acLayerCenterNorm;
+gl_FragColor = texture2DCv(inputImg.texture, uv);
+}]]></shader>
+</effect>

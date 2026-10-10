@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect id="com.gmfx.effects.equalizer" name="GM Equalizer Bars" desc="Rhythm equalizer bars dancing along the frame edge with glow, gradient and mirror mode" category="procedural" tags="equalizer,music,audio,bars,rhythm,viz" overdraw="false" thumb="thumb/gm/gmequalizer.webp">
+<params>
+<texture id="inputImg" srcType="content"/>
+<section text="BARS"/>
+<spinner id="barCount" default="24.0" min="4.0" max="64.0" step="1.0" label="Bar Count"/>
+<spinner id="barHeight" default="35.0" min="2.0" max="90.0" step="1.0" label="Max Height" type="percent"/>
+<spinner id="barGap" default="0.35" min="0.0" max="0.8" step="0.01" label="Bar Gap" type="percent"/>
+<spinner id="vizSpeed" default="1.0" min="0.0" max="4.0" step="0.05" label="Dance Speed"/>
+<spinner id="vizSeed" default="0.0" min="0.0" max="100.0" step="1.0" label="Pattern Seed"/>
+<section text="STYLE"/>
+<color id="barColA" default="#00E5FF" label="Bar Base Color" alpha="false"/>
+<color id="barColB" default="#B537F2" label="Bar Tip Color" alpha="false"/>
+<spinner id="barGlow" default="0.6" min="0.0" max="2.0" step="0.05" label="Bar Glow"/>
+<switch id="mirrorBars" default="false" label="Mirror Left-Right"/>
+<switch id="barsOverlay" default="true" label="Overlay on Photo"/>
+</params>
+<shader type="fragment" precision="high"><![CDATA[float gmHash2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+float gmBarLevel(float id, float t, float seed){
+float h = gmHash2(vec2(id, seed));
+float h2 = gmHash2(vec2(id * 1.7, seed + 3.0));
+float a = sin(t * (2.0 + h * 3.0) + h * 6.2831);
+float b = sin(t * (1.1 + h2 * 2.3) + h2 * 6.2831 + a * 0.8);
+float c = 0.5 + 0.5 * sin(t * 0.7 + id * 0.35);
+float lvl = 0.5 + 0.34 * a * c + 0.26 * b;
+return clamp(lvl, 0.06, 1.0);
+}
+void main(){
+vec2 uv = acScreenNorm;
+vec4 src = texture2DCv(inputImg.texture, uv);
+float n = max(floor(barCount), 4.0);
+float xpos = uv.x;
+if (mirrorBars) {
+xpos = abs(xpos * 2.0 - 1.0);
+n = max(floor(n * 0.5), 4.0);
+}
+float bid = floor(xpos * n);
+float bf = fract(xpos * n);
+float gap = clamp(barGap, 0.0, 0.8);
+float barM = step(gap * 0.5, bf) * step(bf, 1.0 - gap * 0.5);
+float lvl = gmBarLevel(bid, acTime * vizSpeed, vizSeed);
+float maxH = barHeight * 0.01;
+float inBar = step(uv.y, lvl * maxH) * barM;
+float hn = clamp(uv.y / max(lvl * maxH, 1e-4), 0.0, 1.0);
+vec3 barCol = mix(barColA.rgb, barColB.rgb, hn);
+float tipD = uv.y - lvl * maxH;
+float glow = exp(-max(tipD, 0.0) * 26.0) * barGlow * barM * step(0.0, tipD);
+vec3 bars = barCol * inBar * (1.0 + barGlow * 0.2) + barCol * glow * 0.45;
+if (barsOverlay) {
+gl_FragColor = vec4(src.rgb * src.a + bars * src.a, src.a);
+} else {
+vec3 bg = vec3(0.01, 0.012, 0.02);
+gl_FragColor = vec4(bg + bars, src.a);
+}
+}]]></shader>
+</effect>

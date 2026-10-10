@@ -1,0 +1,383 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.moblurae"
+name="Motion Blur ae"
+desc="Amazing New Extra FX from the Modder"
+category="blur"
+tags="blur"
+thumb="thumb/SKEXNXX/moblur.webp"
+experimental="false">
+<params>
+<texture id="inputImg" srcType="content" />
+<slider id="tune" default="1.0" min="0.0" max="4.0" label="Tune" step="0.1" snap="1.0" ticks="1.0" />
+<point id="PANGLE" default="0.5,0.5" min="0.01,0.01" max="2.0, 2.0" label="Pivot Angle" step="0.01" />
+<point id="PSCALE" default="0.5,0.5" min="0.01,0.01" max="2.0, 2.0" label="Pivot Scale" step="0.01" />
+<slider id="samples" default="128" min="4" max="2048" label="Samples" step="1" snap="1" ticks="0" />
+<slider id="shutter" default="180.0" min="0.0" max="720.0" label="Shutter Angle" step="1.0" />
+<slider id="phase" default="0.0" min="-0.5" max="0.5" label="Shutter Phase" step="0.01" />
+<slider id="shutterSamples" default="128" min="1" max="4096" label="Shutter Samples Cap" step="1" snap="1" />
+<slider id="shutterBias" default="0.0" min="-1.0" max="1.0" label="Shutter Bias" step="0.01" />
+<slider id="shutterCurve" default="1.0" min="0.25" max="4.0" label="Shutter Curve" step="0.05" />
+<slider id="shutterShape" default="2" min="0" max="3" label="Shutter Shape (0 Box, 1 Tri, 2 Cos, 3 Gauss)" step="1" snap="1" ticks="0,1,2,3" />
+<slider id="gaussSigma" default="0.35" min="0.10" max="1.00" label="Gaussian Sigma" step="0.01" />
+<slider id="exposureComp" default="1.0" min="0.5" max="2.0" label="Exposure Compensation" step="0.01" />
+<slider id="softenHi" default="0.5" min="0.0" max="1.0" label="High-speed Softening" step="0.01" />
+<slider id="blueNoiseSeed" default="0.0" min="0.0" max="1000.0" label="Noise Seed" step="0.1" />
+<switch id="useHybrid" default="false" label="Hybrid (Spin+Move+Zoom)" />
+<slider id="hybridMix" default="0.6" min="0.0" max="1.0" label="Spin Weight" step="0.01" />
+<slider id="zoomMix" default="0.5" min="0.0" max="1.0" label="Zoom Weight" step="0.01" />
+<switch id="usePos" default="true" label="Position" />
+<switch id="useScale" default="true" label="Scale" />
+<switch id="useAngle" default="true" label="Angle" />
+<slider id="swirlStrength" default="1.5" min="0.0" max="5.0" label="Swirl Strength" step="0.05" />
+<slider id="quality" default="1" min="0" max="2" label="Quality (0 Low, 1 Med, 2 High)" step="1" snap="1" ticks="0" />
+</params>
+<script lang="js"><![CDATA[function animate(env,el,p) {
+let groups = [];
+if( p.usePos && (Math.abs(env.velocity.x) > 0.0001 || Math.abs(env.velocity.y) > 0.0001) ) {
+groups.push(2);
+}
+if( p.useScale && Math.abs(env.scaleVelocity) > 0.0001 ) {
+groups.push(1);
+}
+if( p.useAngle && Math.abs(env.angularVelocity) > 0.0001 ) {
+groups.push(0);
+}
+if( p.useHybrid && (Math.abs(env.angularVelocity) > 0.0001 || Math.abs(env.scaleVelocity) > 0.0001 || Math.abs(env.velocity.x) > 0.0001 || Math.abs(env.velocity.y) > 0.0001) ) {
+groups.push(3);
+}
+el.shaderGroups = groups;
+return el;
+}]]></script>
+<shader type="fragment" group="0" precision="high"><![CDATA[vec3 toLinear(vec3 c){ return pow(max(c, 0.0), vec3(2.2)); }
+vec3 toSRGB(vec3 c){ return pow(max(c, 0.0), vec3(1.0/2.2)); }
+float halton(int i, int b){
+float f = 1.0;
+float r = 0.0;
+int n = i;
+for(int j=0; j<20; j++){
+if(n <= 0) break;
+f /= float(b);
+float digit = mod(float(n), float(b));
+r += f * digit;
+n = n / b;
+}
+return r;
+}
+float shutterWeight(float t, int shape, float curve, float sigma){
+t = clamp(t, -0.5, 0.5);
+float x = abs(t*2.0);
+if(shape==0) return 1.0;
+if(shape==1) return pow(max(0.0, 1.0-x), curve);
+if(shape==2) return max(0.0, cos(3.14159265*t));
+float g = exp(-(t*t)/(2.0*sigma*sigma));
+return pow(g, curve);
+}
+void main() {
+float angle = abs(acAngularVelocity) * (shutter/360.0) * tune;
+float cx = PANGLE.x + acLayerPivot.x/acLayerSize.x;
+float cy = PANGLE.y - acLayerPivot.y/acLayerSize.y;
+vec2 image_size = inputImg.size;
+float maxF = max(acScreenSize.x, acScreenSize.y);
+vec2 texelSize = 1.0 / vec2(maxF, maxF);
+vec2 center = (vec4(cx,cy,0.0,1.0) * acLayerToScreen).xy;
+vec2 v = acScreenNorm.st - center;
+v.y *= image_size.y / image_size.x;
+float r = length(v);
+float rN = clamp(r, 0.0, 1.0);
+float swirl = 1.0 + swirlStrength * rN;
+float d = 6.283185*r;
+float l = d*angle/360.0;
+float a = angle * 0.0174533;
+float speed = l/texelSize.x;
+int q = int(quality + 0.5);
+float samplesQ = float(samples);
+float capQ = float(shutterSamples);
+float curveQ = shutterCurve;
+if (q == 0) { samplesQ = max(4.0, samplesQ * 0.5); capQ = max(4.0, capQ * 0.5); curveQ = max(0.25, curveQ * 0.8); }
+else if (q == 2) { samplesQ = samplesQ * 1.5; capQ = capQ * 2.0; curveQ = curveQ * 1.5; }
+int nMax = int(samplesQ + 0.5);
+int nSamples = int(clamp(speed, 1.01, float(nMax)+0.01));
+int nCap = int(capQ + 0.5);
+nSamples = min(nSamples, nCap);
+vec4 accum = vec4(0.0);
+float wsum = 0.0;
+int shape = int(shutterShape + 0.5);
+for (int i = 0; i < nSamples; i++) {
+float u = halton(i, 2);
+float k = mix(0.5, 2.0, (shutterBias + 1.0) * 0.5);
+u = pow(u, k);
+float jitter = (fract(sin(dot(gl_FragCoord.xy+float(i)+blueNoiseSeed, vec2(12.9898,78.233))) * 43758.5453) - 0.5) / float(nSamples);
+float t = clamp(u - 0.5 + phase + jitter, -0.5, 0.5);
+float sampleAngle = t * a * swirl;
+float s = sin(sampleAngle);
+float c = cos(sampleAngle);
+mat2 rot = mat2(c, -s, s, c);
+vec2 temp = v*rot;
+temp.y = temp.y * image_size.x / image_size.y;
+vec2 sampleUV = center + temp;
+float w = shutterWeight(t, shape, curveQ, gaussSigma);
+float lod = clamp(speed/150.0, 0.0, 1.0) * softenHi;
+vec2 px = vec2(1.0) / max(vec2(image_size.x, image_size.y), 1.0);
+vec4 raw = texture2DCv(inputImg.texture, sampleUV);
+vec4 soft = (raw + texture2DCv(inputImg.texture, sampleUV + px) + texture2DCv(inputImg.texture, sampleUV - px)) / 3.0;
+vec4 col = mix(raw, soft, lod);
+accum.rgb += toLinear(col.rgb) * col.a * w;
+accum.a   += col.a * w;
+wsum += w;
+}
+vec4 base = texture2DCv(inputImg.texture, acScreenNorm.st);
+accum.rgb += toLinear(base.rgb) * base.a;
+accum.a   += base.a;
+wsum += 1.0;
+vec3 outPremultLin = accum.rgb / max(wsum, 1e-6);
+float outA = accum.a / max(wsum, 1e-6);
+vec3 outLin = outPremultLin / max(outA, 1e-6);
+vec3 outSRGB = toSRGB(outLin) * exposureComp;
+gl_FragColor = vec4(outSRGB, outA);
+}]]></shader>
+<shader type="fragment" group="1" precision="high"><![CDATA[vec3 toLinear(vec3 c){ return pow(max(c, 0.0), vec3(2.2)); }
+vec3 toSRGB(vec3 c){ return pow(max(c, 0.0), vec3(1.0/2.2)); }
+float halton(int i, int b){
+float f = 1.0;
+float r = 0.0;
+int n = i;
+for(int j=0; j<20; j++){
+if(n <= 0) break;
+f /= float(b);
+float digit = mod(float(n), float(b));
+r += f * digit;
+n = n / b;
+}
+return r;
+}
+float shutterWeight(float t, int shape, float curve, float sigma){
+t = clamp(t, -0.5, 0.5);
+float x = abs(t*2.0);
+if(shape==0) return 1.0;
+if(shape==1) return pow(max(0.0, 1.0-x), curve);
+if(shape==2) return max(0.0, cos(3.14159265*t));
+float g = exp(-(t*t)/(2.0*sigma*sigma));
+return pow(g, curve);
+}
+void main() {
+vec2 image_size = inputImg.size;
+float maxF = max(acScreenSize.x, acScreenSize.y);
+vec2 texelSize = 1.0 / vec2(maxF, maxF);
+float cx = PSCALE.x + acLayerPivot.x/acLayerSize.x;
+float cy = PSCALE.y - acLayerPivot.y/acLayerSize.y;
+vec2 center = vec2(cx,cy);
+vec2 v = acScreenNorm.st - (vec4(center,0.0,1.0) * acLayerToScreen).xy;
+v.y *= image_size.y / image_size.x;
+float speed = abs(acScaleVelocity*tune) / 2.0;
+speed *= length( acLayerNorm.st - center );
+int q = int(quality + 0.5);
+float samplesQ = float(samples);
+float capQ = float(shutterSamples);
+float curveQ = shutterCurve;
+if (q == 0) { samplesQ = max(4.0, samplesQ * 0.5); capQ = max(4.0, capQ * 0.5); curveQ = max(0.25, curveQ * 0.8); }
+else if (q == 2) { samplesQ = samplesQ * 1.5; capQ = capQ * 2.0; curveQ = curveQ * 1.5; }
+int nMax = int(samplesQ + 0.5);
+int nSamples = int(clamp(speed, 1.01, float(nMax)+0.01));
+int nCap = int(capQ + 0.5);
+nSamples = min(nSamples, nCap);
+vec2 vnorm = normalize(v)*length(texelSize)*speed;
+vec4 accum = vec4(0.0);
+float wsum = 0.0;
+int shape = int(shutterShape + 0.5);
+for (int i = 0; i < nSamples; i++ ) {
+float u = halton(i, 2);
+float k = mix(0.5, 2.0, (shutterBias + 1.0) * 0.5);
+u = pow(u, k);
+float jitter = (fract(sin(dot(gl_FragCoord.xy+float(i)+blueNoiseSeed, vec2(12.9898,78.233))) * 43758.5453) - 0.5) / float(nSamples);
+float t = clamp(u - 0.5 + phase + jitter, -0.5, 0.5);
+vec2 offset = vnorm * t;
+offset.y = offset.y * image_size.x / image_size.y;
+vec2 sampleUV = acScreenNorm.st - offset;
+float w = shutterWeight(t, shape, curveQ, gaussSigma);
+float lod = clamp(speed/150.0, 0.0, 1.0) * softenHi;
+vec2 px = vec2(1.0) / max(vec2(image_size.x, image_size.y), 1.0);
+vec4 raw = texture2DCv(inputImg.texture, sampleUV);
+vec4 soft = (raw + texture2DCv(inputImg.texture, sampleUV + px) + texture2DCv(inputImg.texture, sampleUV - px)) / 3.0;
+vec4 col = mix(raw, soft, lod);
+accum.rgb += toLinear(col.rgb) * col.a * w;
+accum.a   += col.a * w;
+wsum += w;
+}
+vec4 base = texture2DCv(inputImg.texture, acScreenNorm.st);
+accum.rgb += toLinear(base.rgb) * base.a;
+accum.a   += base.a;
+wsum += 1.0;
+vec3 outPremultLin = accum.rgb / max(wsum, 1e-6);
+float outA = accum.a / max(wsum, 1e-6);
+vec3 outLin = outPremultLin / max(outA, 1e-6);
+vec3 outSRGB = toSRGB(outLin) * exposureComp;
+gl_FragColor = vec4(outSRGB, outA);
+}]]></shader>
+<shader type="fragment" group="2" precision="high"><![CDATA[vec3 toLinear(vec3 c){ return pow(max(c, 0.0), vec3(2.2)); }
+vec3 toSRGB(vec3 c){ return pow(max(c, 0.0), vec3(1.0/2.2)); }
+float halton(int i, int b){
+float f = 1.0;
+float r = 0.0;
+int n = i;
+for(int j=0; j<20; j++){
+if(n <= 0) break;
+f /= float(b);
+float digit = mod(float(n), float(b));
+r += f * digit;
+n = n / b;
+}
+return r;
+}
+float shutterWeight(float t, int shape, float curve, float sigma){
+t = clamp(t, -0.5, 0.5);
+float x = abs(t*2.0);
+if(shape==0) return 1.0;
+if(shape==1) return pow(max(0.0, 1.0-x), curve);
+if(shape==2) return max(0.0, cos(3.14159265*t));
+float g = exp(-(t*t)/(2.0*sigma*sigma));
+return pow(g, curve);
+}
+void main() {
+vec2 image_size = inputImg.size;
+float maxF = max(acScreenSize.x, acScreenSize.y);
+vec2 texelSize = 1.0 / vec2(maxF, maxF);
+vec2 velocity = acVelocity*tune / acScreenSize;
+float speed = length(velocity / texelSize);
+int q = int(quality + 0.5);
+float samplesQ = float(samples);
+float capQ = float(shutterSamples);
+float curveQ = shutterCurve;
+if (q == 0) { samplesQ = max(4.0, samplesQ * 0.5); capQ = max(4.0, capQ * 0.5); curveQ = max(0.25, curveQ * 0.8); }
+else if (q == 2) { samplesQ = samplesQ * 1.5; capQ = capQ * 2.0; curveQ = curveQ * 1.5; }
+int nMax = int(samplesQ + 0.5);
+int nSamples = int(clamp(speed, 1.01, float(nMax)+0.01));
+int nCap = int(capQ + 0.5);
+nSamples = min(nSamples, nCap);
+vec4 accum = vec4(0.0);
+float wsum = 0.0;
+int shape = int(shutterShape + 0.5);
+for (int i = 0; i < nSamples; i++ ) {
+float u = halton(i, 2);
+float k = mix(0.5, 2.0, (shutterBias + 1.0) * 0.5);
+u = pow(u, k);
+float jitter = (fract(sin(dot(gl_FragCoord.xy+float(i)+blueNoiseSeed, vec2(12.9898,78.233))) * 43758.5453) - 0.5) / float(nSamples);
+float t = clamp(u - 0.5 + phase + jitter, -0.5, 0.5);
+vec2 offset = velocity * t;
+offset.y = offset.y * image_size.x / image_size.y;
+vec2 sampleUV = acScreenNorm.st - offset;
+float w = shutterWeight(t, shape, curveQ, gaussSigma);
+float lod = clamp(speed/150.0, 0.0, 1.0) * softenHi;
+vec2 px = vec2(1.0) / max(vec2(image_size.x, image_size.y), 1.0);
+vec4 raw = texture2DCv(inputImg.texture, sampleUV);
+vec4 soft = (raw + texture2DCv(inputImg.texture, sampleUV + px) + texture2DCv(inputImg.texture, sampleUV - px)) / 3.0;
+vec4 col = mix(raw, soft, lod);
+accum.rgb += toLinear(col.rgb) * col.a * w;
+accum.a   += col.a * w;
+wsum += w;
+}
+vec4 base = texture2DCv(inputImg.texture, acScreenNorm.st);
+accum.rgb += toLinear(base.rgb) * base.a;
+accum.a   += base.a;
+wsum += 1.0;
+vec3 outPremultLin = accum.rgb / max(wsum, 1e-6);
+float outA = accum.a / max(wsum, 1e-6);
+vec3 outLin = outPremultLin / max(outA, 1e-6);
+vec3 outSRGB = toSRGB(outLin) * exposureComp;
+gl_FragColor = vec4(outSRGB, outA);
+}]]></shader>
+<shader type="fragment" group="3" precision="high"><![CDATA[vec3 toLinear(vec3 c){ return pow(max(c, 0.0), vec3(2.2)); }
+vec3 toSRGB(vec3 c){ return pow(max(c, 0.0), vec3(1.0/2.2)); }
+float halton(int i, int b){
+float f = 1.0;
+float r = 0.0;
+int n = i;
+for(int j=0; j<20; j++){
+if(n <= 0) break;
+f /= float(b);
+float digit = mod(float(n), float(b));
+r += f * digit;
+n = n / b;
+}
+return r;
+}
+float shutterWeight(float t, int shape, float curve, float sigma){
+t = clamp(t, -0.5, 0.5);
+float x = abs(t*2.0);
+if(shape==0) return 1.0;
+if(shape==1) return pow(max(0.0, 1.0-x), curve);
+if(shape==2) return max(0.0, cos(3.14159265*t));
+float g = exp(-(t*t)/(2.0*sigma*sigma));
+return pow(g, curve);
+}
+void main() {
+vec2 image_size = inputImg.size;
+float maxF = max(acScreenSize.x, acScreenSize.y);
+vec2 texelSize = 1.0 / vec2(maxF, maxF);
+float cx = PANGLE.x + acLayerPivot.x/acLayerSize.x;
+float cy = PANGLE.y - acLayerPivot.y/acLayerSize.y;
+vec2 pivot = (vec4(cx,cy,0.0,1.0) * acLayerToScreen).xy;
+float angleDeg = acAngularVelocity * (shutter/360.0) * tune;
+float a = angleDeg * 0.017453292519943295;
+vec2 velocity = acVelocity * tune / acScreenSize;
+float svel = acScaleVelocity * tune;
+vec2 v = acScreenNorm.st - pivot;
+v.y *= image_size.y / image_size.x;
+float arcLen = 6.283185 * length(v) * abs(angleDeg) / 360.0;
+float speedRot = arcLen / texelSize.x;
+float speedLin = length(velocity / texelSize);
+float speedZoom = abs(svel) * length(v) / texelSize.x * 0.5;
+float speed = hybridMix * speedRot + (1.0 - hybridMix) * speedLin + zoomMix * speedZoom;
+int q = int(quality + 0.5);
+float samplesQ = float(samples);
+float capQ = float(shutterSamples);
+float curveQ = shutterCurve;
+if (q == 0) { samplesQ = max(4.0, samplesQ * 0.5); capQ = max(4.0, capQ * 0.5); curveQ = max(0.25, curveQ * 0.8); }
+else if (q == 2) { samplesQ = samplesQ * 1.5; capQ = capQ * 2.0; curveQ = curveQ * 1.5; }
+int nMax = int(samplesQ + 0.5);
+int nSamples = int(clamp(speed, 1.01, float(nMax)+0.01));
+int nCap = int(capQ + 0.5);
+nSamples = min(nSamples, nCap);
+vec4 accum = vec4(0.0);
+float wsum = 0.0;
+int shape = int(shutterShape + 0.5);
+for (int i = 0; i < nSamples; i++) {
+float u = halton(i, 2);
+float k = mix(0.5, 2.0, (shutterBias + 1.0) * 0.5);
+u = pow(u, k);
+float jitter = (fract(sin(dot(gl_FragCoord.xy+float(i)+blueNoiseSeed, vec2(12.9898,78.233))) * 43758.5453) - 0.5) / float(nSamples);
+float t = clamp(u - 0.5 + phase + jitter, -0.5, 0.5);
+float aT = t * a * hybridMix;
+float s = sin(aT);
+float c = cos(aT);
+mat2 rot = mat2(c, -s, s, c);
+vec2 rotV = rot * v;
+float zoom = exp(t * svel * zoomMix);
+vec2 zoomV = rotV * zoom;
+vec2 trans = velocity * (1.0 - hybridMix) * t;
+trans.y = trans.y * image_size.x / image_size.y;
+vec2 sampleUV = pivot + zoomV - trans;
+float w = shutterWeight(t, shape, curveQ, gaussSigma);
+float speedRot = arcLen / texelSize.x;
+float speedLin = length(velocity / texelSize);
+float speedZoom = abs(svel) * length(v) / texelSize.x * 0.5;
+float speed = hybridMix * speedRot + (1.0 - hybridMix) * speedLin + zoomMix * speedZoom;
+float lod = clamp(speed/150.0, 0.0, 1.0) * softenHi;
+vec2 px = vec2(1.0) / max(vec2(image_size.x, image_size.y), 1.0);
+vec4 raw = texture2DCv(inputImg.texture, sampleUV);
+vec4 soft = (raw + texture2DCv(inputImg.texture, sampleUV + px) + texture2DCv(inputImg.texture, sampleUV - px)) / 3.0;
+vec4 col = mix(raw, soft, lod);
+accum.rgb += toLinear(col.rgb) * col.a * w;
+accum.a   += col.a * w;
+wsum += w;
+}
+vec4 base = texture2DCv(inputImg.texture, acScreenNorm.st);
+accum.rgb += toLinear(base.rgb) * base.a;
+accum.a   += base.a;
+wsum += 1.0;
+vec3 outPremultLin = accum.rgb / max(wsum, 1e-6);
+float outA = accum.a / max(wsum, 1e-6);
+vec3 outLin = outPremultLin / max(outA, 1e-6);
+vec3 outSRGB = toSRGB(outLin) * exposureComp;
+gl_FragColor = vec4(outSRGB, outA);
+}]]></shader>
+</effect>

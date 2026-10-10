@@ -1,0 +1,86 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect
+id="com.alightcreative.effects.s_warp_magnify"
+name="Warp Magnify"
+desc="Magnifies an area with elliptical controls and rotation, matching Sapphire S_WarpMagnify."
+category="distortion"
+tags="warp,magnify,lens,distortion,sapphire"
+thumb="thumb/warpmag.webp"
+experimental="false">
+<params>
+<texture id="inputImg" srcType="content" />
+<section text="Lens Controls" />
+<point id="center" default="0.5,0.5" label="Center" />
+<spinner id="magnifyAmount" default="2.0" min="0.0" max="10.0" step="0.01" label="Magnify Amount" />
+<point id="magnifyRel" default="1.0,1.0" label="Magnify Rel X/Y" />
+<section text="Shape" />
+<spinner id="lensRadius" default="0.3" min="0.0" max="2.0" step="0.01" label="Lens Radius" />
+<spinner id="lensEdgeWidth" default="0.5" min="0.0" max="2.0" step="0.01" label="Lens Edge Width" />
+<spinner id="lensRelWidth" default="1.2" min="0.1" max="10.0" step="0.01" label="Lens Rel Width" />
+<spinner id="lensRelHeight" default="0.8" min="0.1" max="10.0" step="0.01" label="Lens Rel Height" />
+<spinner id="lensRotate" default="25.0" min="-360.0" max="360.0" step="0.1" label="Lens Rotate" />
+<spinner id="lensEdgeShape" default="1.0" min="0.0" max="1.0" step="0.01" label="Lens Edge Shape" />
+<section text="Rendering" />
+<spinner id="wrapMode" default="2" min="0" max="2" step="1" snap="1" label="Wrap Mode (0:No, 1:Tile, 2:Reflect)" />
+<switch id="followLayer" default="true" label="Follow Layer" />
+<slider id="blend" default="1.0" min="0.0" max="1.0" label="Blend" type="percent" />
+</params>
+<passes>
+<pass />
+</passes>
+<shader type="fragment" precision="medium"><![CDATA[#define PI 3.14159265359
+vec2 rotate(vec2 v, float angle) {
+float s = sin(angle);
+float c = cos(angle);
+return vec2(v.x * c - v.y * s, v.x * s + v.y * c);
+}
+vec2 applyWrap(vec2 uv, int mode) {
+if (mode == 1) return fract(uv);
+if (mode == 2) return abs(mod(uv - 1.0, 2.0) - 1.0);
+return uv;
+}
+void main() {
+vec2 luv = acLayerNorm.xy;
+vec2 suv = acScreenNorm.xy;
+vec2 uv;
+vec2 aspect;
+if(followLayer) {
+uv = luv;
+aspect = vec2(acLayerSize.x / acLayerSize.y, 1.0);
+} else {
+uv = suv;
+aspect = vec2(acScreenSize.x / acScreenSize.y, 1.0);
+}
+vec2 p = uv - center;
+p.x *= aspect.x;
+float rad = lensRotate * (PI / 180.0);
+p = rotate(p, rad);
+p.x /= max(0.01, lensRelWidth);
+p.y /= max(0.01, lensRelHeight);
+float d = length(p);
+float edgeSize = lensRadius * lensEdgeWidth;
+float magFactor = 1.0;
+if (d < lensRadius) {
+magFactor = magnifyAmount;
+}
+else if (d < lensRadius + edgeSize) {
+float t = (d - lensRadius) / edgeSize;
+float curve = mix(t, smoothstep(0.0, 1.0, t), lensEdgeShape);
+magFactor = mix(magnifyAmount, 1.0, curve);
+}
+vec2 warpedP = p;
+warpedP /= (magFactor * magnifyRel);
+warpedP.x *= lensRelWidth;
+warpedP.y *= lensRelHeight;
+warpedP = rotate(warpedP, -rad);
+warpedP.x /= aspect.x;
+vec2 finalUV = center + warpedP;
+finalUV = applyWrap(finalUV, int(wrapMode));
+vec4 color = texture2DCv(inputImg.texture, finalUV);
+if (d > lensRadius && d < lensRadius + edgeSize) {
+color.rgb *= mix(0.95, 1.0, (d - lensRadius) / edgeSize);
+}
+vec4 base = texture2DCv(inputImg.texture, suv);
+gl_FragColor = mix(base, color, blend);
+}]]></shader>
+</effect>

@@ -1,0 +1,1566 @@
+[
+  {
+    "id": "com.alightcreative.shapes.arc",
+    "name": "Arc",
+    "fileName": "arc.xml",
+    "params": [
+      {
+        "id": "startAngle",
+        "min": "-3600",
+        "max": "3600",
+        "default": "0",
+        "step": "1",
+        "label": "@am:string/effect_param_start",
+        "ticks": "0,45,90,135,180,225,270,315,360",
+        "type": "angle",
+        "paramType": "spinner"
+      },
+      {
+        "id": "endAngle",
+        "min": "-3600",
+        "max": "3600",
+        "default": "90",
+        "step": "1",
+        "label": "@am:string/effect_param_end",
+        "ticks": "0,45,90,135,180,225,270,315,360",
+        "type": "angle",
+        "paramType": "spinner"
+      },
+      {
+        "id": "radius",
+        "min": "0",
+        "max": "2000",
+        "default": "100",
+        "step": "1",
+        "label": "@am:string/effect_param_radius",
+        "paramType": "spinner"
+      },
+      {
+        "id": "closed",
+        "default": "false",
+        "label": "@am:string/effect_param_closed",
+        "paramType": "switch"
+      }
+    ],
+    "handles": [
+      {
+        "id": "r",
+        "param": "radius",
+        "type": "radius",
+        "icon": "grip"
+      },
+      {
+        "id": "s",
+        "param": "startAngle",
+        "type": "angle",
+        "style": "square",
+        "icon": "grip"
+      },
+      {
+        "id": "e",
+        "param": "endAngle",
+        "type": "angle",
+        "style": "square",
+        "icon": "grip"
+      }
+    ],
+    "script": "\n\n        function getHandles(params) {\n\n            let startAngle = params.startAngle * Math.PI / 180\n            let endAngle = params.endAngle * Math.PI / 180\n            let radius = params.radius;\n            startAngle += 2000 * Math.PI;\n            endAngle += 2000 * Math.PI;\n\n            let lowAngle = Math.min(startAngle,endAngle)\n            let highAngle = Math.max(startAngle,endAngle)\n            let diff = ((highAngle - lowAngle)/(Math.PI*2.0)) % 2.0;\n\n            lowAngle %= (Math.PI*2.0);\n            highAngle %= (Math.PI*2.0);\n\n            if( diff < 1.0 ) {\n                lowAngle += Math.PI*2.0;\n            } else {\n                highAngle += Math.PI*2.0;\n            }\n\n            //let radiusAngle = (lowAngle + Math.abs(highAngle-lowAngle)/2.0);\n            //let radiusAngle = (highAngle+lowAngle)/2.0;\n            let radiusAngle = (startAngle+endAngle)/2.0 + Math.PI;\n\n            //if( diff < 1.0 ) {\n            //    radiusAngle = (radiusAngle + Math.PI) % (Math.PI*2.0);\n            //}\n\n            //AM.log(`arcShape: diff=${diff} lowAngle=${lowAngle} highAngle=${highAngle} radiusAngle=${radiusAngle} l>h=${lowAngle>highAngle} d=${(highAngle-lowAngle)/(Math.PI*2.0)}`);\n\n            //if( Math.abs(lowAngle-highAngle) < Math.PI/6.0 ) {\n            //    radiusAngle += Math.PI/3.0;\n            //}\n\n            //let radiusHandle = [radius,0];\n            //let rightHandleOK = Math.abs(startAngle) > Math.PI / 3 && Math.abs(endAngle) > Math.PI / 3 && Math.abs(startAngle-Math.PI*2.0) > Math.PI / 3 && Math.abs(endAngle-Math.PI*2.0) > Math.PI / 3;\n            //let leftHandleOK = Math.abs(startAngle-Math.PI) > Math.PI / 4 && Math.abs(endAngle-Math.PI) > Math.PI / 4;\n            //let topHandleOK = Math.abs(startAngle-Math.PI/2) > Math.PI / 4 && Math.abs(endAngle-Math.PI/2) > Math.PI / 4;\n            //\n            //if( rightHandleOK ) {\n            //    radiusHandle = [radius,0];\n            //} else if( leftHandleOK ) {\n            //    radiusHandle = [-radius,0];\n            //} else if( topHandleOK ) {\n            //    radiusHandle = [0,-radius];\n            //}\n\n            return {\n                r: [radius*Math.cos(radiusAngle),radius*-Math.sin(radiusAngle)],\n                s: [radius*Math.cos(startAngle),radius*-Math.sin(startAngle)],\n                e: [radius*Math.cos(endAngle),radius*-Math.sin(endAngle)]\n            }\n        }\n\n        /**\n         * Create a series of arcs approximating a circular arc around (0,0)\n         * with radius radius and the given startAngle and endAngle (angles\n         * considered counter-clockwise from the x axis).\n        */\n        function createArc(radius, startAngle, endAngle) {\n            let twoPI = Math.PI * 2;\n            let angleDiff = (endAngle - startAngle) % twoPI;\n            let startAngleN = Math.abs(startAngle) > twoPI ? startAngle % twoPI : startAngle;\n            let endAngleN = startAngleN + angleDiff; //Math.abs(endAngle) > twoPI ? endAngle % twoPI : endAngle;\n            let curves = [];\n            let piOverTwo = Math.PI / 2.0;\n            let sgn = (startAngle < endAngle) ? +1 : -1; // clockwise or counterclockwise\n            let a1 = startAngle;\n\n            //AM.log(`PieShape createArc: sgn=${sgn}`);\n\n            //if( (startAngle < endAngle) != (startAngleN < endAngleN) ) {\n            //    [startAngleN,endAngleN] = [endAngleN,startAngleN];\n            //}\n\n            for (var totalAngle = Math.min(twoPI, Math.abs(endAngleN - startAngleN)); totalAngle > 0.00001; ) {\n                var a2 = a1 + sgn * Math.min(totalAngle, piOverTwo);\n                curves.push(createSmallArc(radius, a1, a2));\n                totalAngle -= Math.abs(a2 - a1);\n                a1 = a2;\n            }\n\n            return curves;\n        }\n\n        /**\n         * Cubic bezier approximation of a circular arc centered at teh origin,\n         * from (radians) a1 to a2, where a2 - a1 < pi / 2. The arc's radius is r.\n         *\n         * Returns an object with four points, where x1, y1, and x4, y4 are the arc's\n         * end points and x2, y2 and x3, y3 are the cubic bezier's control points.\n         *\n         * This algorithm is based on teh approach described in:\n         * A. Riskus, \"Approximation of a cubic Bezier Curbe by Circular Arcs and Vice Versa,\"\n         * Information Technology and Control, 35(4) 2006 pp. 371-378.\n         *\n         * create[Small]Arc translated from the original AS version by Hans Muller\n         * https://hansmuller-flex.blogspot.com/2011/10/more-about-approximating-circular-arcs.html\n         * Licensed under Creative Commons 3.0 by Attribution\n         * http://creativecommons.org/licenses/by/3.0/\n         */\n        function createSmallArc(r, a1, a2) {\n          // compute for an arc of the same angle, but centered around the x-axis\n          var\n          a = (a2 - a1) / 2.0,\n\n          x4 = r * Math.cos(a),\n          y4 = r * Math.sin(a),\n          x1 = x4,\n          y1 = -y4,\n\n          q1 = x1 * x1 + y1 * y1,\n          q2 = q1 + x1 * x4 + y1 * y4,\n          k2 = 4/3 * (Math.sqrt(2 * q1 * q2) - q2) / (x1 * y4 - y1 * x4),\n\n          x2 = x1 - k2 * y1,\n          y2 = y1 + k2 * x1,\n          x3 = x2,\n          y3 = -y2,\n\n          ar = a + a1,\n          cos_ar = Math.cos(ar),\n          sin_ar = Math.sin(ar);\n\n          return {\n            'x1': r * Math.cos(a1),\n            'y1': r * Math.sin(a1),\n            'x2': x2 * cos_ar - y2 * sin_ar,\n            'y2': x2 * sin_ar + y2 * cos_ar,\n            'x3': x3 * cos_ar - y3 * sin_ar,\n            'y3': x3 * sin_ar + y3 * cos_ar,\n            'x4': r * Math.cos(a2),\n            'y4': r * Math.sin(a2)\n          };\n        }\n\n        function posMod(x,m) {return (x % m + m) % m}\n\n        function getPath(params) {\n\n            let startAngle = -params.startAngle * Math.PI / 180\n            let endAngle = -params.endAngle * Math.PI / 180\n            let radius = params.radius;\n            startAngle += 2000 * Math.PI;\n            endAngle += 2000 * Math.PI;\n\n            let lowAngle = Math.min(startAngle,endAngle)\n            let highAngle = Math.max(startAngle,endAngle)\n            let diff = ((highAngle - lowAngle)/(Math.PI*2.0)) % 2.0;\n\n            lowAngle %= (Math.PI*2.0);\n            highAngle %= (Math.PI*2.0);\n\n            if( diff < 1.0 ) {\n                lowAngle += Math.PI*2.0;\n            } else {\n                highAngle += Math.PI*2.0;\n            }\n\n            let curves = createArc(radius,lowAngle,highAngle)\n\n            let xscale = 1.0;\n            let points = []\n            for( let i=0; i<curves.length; i++ ) {\n                let c = curves[i]\n                if( points.length > 0 ) {\n                    points[points.length-1].out = [c.x2 * xscale, c.y2];\n                } else {\n                    points.push({p:[c.x1 * xscale,c.y1], out:[c.x2 * xscale,c.y2]})\n                }\n                points.push({in:[c.x3 * xscale,c.y3], p:[c.x4 * xscale,c.y4]})\n            }\n            //points.push([0,0]);\n            points.push({closed:params.closed});\n            return points;\n\n\n        }\n\n    "
+  },
+  {
+    "id": "com.alightcreative.shapes.arrow",
+    "name": "Arrow",
+    "fileName": "arrow.xml",
+    "params": [
+      {
+        "id": "start",
+        "label": "@am:string/effect_param_start",
+        "default": "0,0",
+        "paramType": "point"
+      },
+      {
+        "id": "end",
+        "label": "@am:string/effect_param_end",
+        "default": "250,-250",
+        "paramType": "point"
+      },
+      {
+        "id": "lineWidth",
+        "min": "0",
+        "max": "2000",
+        "default": "40",
+        "step": "1",
+        "label": "@am:string/effect_param_tail_width",
+        "paramType": "spinner"
+      },
+      {
+        "id": "headWidth",
+        "min": "0",
+        "max": "2000",
+        "default": "120",
+        "step": "1",
+        "label": "@am:string/effect_param_head_width",
+        "paramType": "spinner"
+      },
+      {
+        "id": "headLength",
+        "min": "0",
+        "max": "2000",
+        "default": "130",
+        "step": "1",
+        "label": "@am:string/effect_param_head_length",
+        "paramType": "spinner"
+      }
+    ],
+    "handles": [
+      {
+        "id": "s",
+        "param": "start",
+        "type": "xy",
+        "icon": "dot"
+      },
+      {
+        "id": "e",
+        "param": "end",
+        "type": "xy",
+        "icon": "hollow-dot"
+      },
+      {
+        "id": "lw",
+        "param": "lineWidth",
+        "type": "axis",
+        "style": "square",
+        "icon": "grip"
+      },
+      {
+        "id": "hw",
+        "param": "headWidth",
+        "type": "axis",
+        "style": "square",
+        "icon": "grip"
+      },
+      {
+        "id": "hl",
+        "param": "headLength",
+        "type": "axis",
+        "style": "square",
+        "icon": "grip"
+      }
+    ],
+    "script": "\n\n        function getHandles(params) {\n            let headWidth = params.headWidth;\n            let headLength = params.headLength;\n            let lineWidth = Math.min(headWidth,params.lineWidth);\n            let end = params.end;\n            let start = params.start;\n            let dx = end.x-start.x;\n            let dy = end.y-start.y;\n            let dlen = Math.hypot(dx,dy);\n            let nx = dx / dlen;\n            let ny = dy / dlen;\n            let tailLength = dlen - headLength;\n            let cwX = -dy / dlen;\n            let cwY = dx / dlen;\n            let ccwX = dy / dlen;\n            let ccwY = -dx / dlen;\n            return {\n                s: params.start,\n                e: params.end,\n                lw: {\n                    x: start.x + cwX * lineWidth + nx * tailLength/3,\n                    y: start.y + cwY * lineWidth + ny * tailLength/3,\n                    axis:[cwX,cwY]\n                },\n                hw: {\n                    x: start.x + cwX * headWidth + nx * tailLength,\n                    y: start.y + cwY * headWidth + ny * tailLength,\n                    axis:[cwX,cwY]\n                },\n                hl: {\n                    x: start.x + ccwX * (lineWidth+headWidth)/2 + nx * tailLength,\n                    y: start.y + ccwY * (lineWidth+headWidth)/2 + ny * tailLength,\n                    axis:[-nx,-ny]\n                }\n            }\n        }\n\n        function getPath(params) {\n            let headWidth = params.headWidth;\n            let headLength = params.headLength;\n            let lineWidth = Math.min(headWidth,params.lineWidth);\n            let end = params.end;\n            let start = params.start;\n            let dx = end.x-start.x;\n            let dy = end.y-start.y;\n            let dlen = Math.hypot(dx,dy);\n            let nx = dx / dlen;\n            let ny = dy / dlen;\n            let tailLength = dlen - headLength;\n            let cwX = -dy / dlen;\n            let cwY = dx / dlen;\n            let ccwX = dy / dlen;\n            let ccwY = -dx / dlen;\n            return [\n                [start.x + cwX * lineWidth, start.y + cwY * lineWidth],\n                [start.x + ccwX * lineWidth, start.y + ccwY * lineWidth],\n                [start.x + ccwX * lineWidth + nx * tailLength, start.y + ccwY * lineWidth + ny * tailLength],\n                [start.x + ccwX * headWidth + nx * tailLength, start.y + ccwY * headWidth + ny * tailLength],\n                [end.x, end.y],\n                [start.x + cwX * headWidth + nx * tailLength, start.y + cwY * headWidth + ny * tailLength],\n                [start.x + cwX * lineWidth + nx * tailLength, start.y + cwY * lineWidth + ny * tailLength],\n                {closed:true}\n            ];\n        }\n\n    "
+  },
+  {
+    "id": "com.alightcreative.shapes.callout.roundrect",
+    "name": "Callout",
+    "fileName": "calloutrr.xml",
+    "params": [
+      {
+        "id": "size",
+        "label": "@am:string/effect_param_size",
+        "default": "100,100",
+        "min": "1,1",
+        "type": "size",
+        "paramType": "point"
+      },
+      {
+        "id": "tail",
+        "label": "@am:string/effect_param_tail",
+        "default": "-50,150",
+        "type": "offset",
+        "paramType": "point"
+      },
+      {
+        "id": "cornerRadius",
+        "min": "0",
+        "max": "2000",
+        "default": "25",
+        "step": "1",
+        "label": "@am:string/effect_param_radius",
+        "paramType": "spinner"
+      },
+      {
+        "id": "tailWidth",
+        "min": "0",
+        "max": "2000",
+        "default": "40",
+        "step": "1",
+        "label": "@am:string/effect_param_tail_width",
+        "paramType": "spinner"
+      }
+    ],
+    "handles": [
+      {
+        "id": "r",
+        "param": "cornerRadius",
+        "type": "x",
+        "style": "square",
+        "icon": "grip"
+      },
+      {
+        "id": "e",
+        "param": "size",
+        "type": "x"
+      },
+      {
+        "id": "w",
+        "param": "size",
+        "type": "x",
+        "invert": "x"
+      },
+      {
+        "id": "n",
+        "param": "size",
+        "type": "y",
+        "invert": "y"
+      },
+      {
+        "id": "s",
+        "param": "size",
+        "type": "y"
+      },
+      {
+        "id": "se",
+        "param": "size",
+        "type": "xy",
+        "ratio": "true"
+      },
+      {
+        "id": "ne",
+        "param": "size",
+        "type": "xy",
+        "invert": "y",
+        "ratio": "true"
+      },
+      {
+        "id": "sw",
+        "param": "size",
+        "type": "xy",
+        "invert": "x",
+        "ratio": "true"
+      },
+      {
+        "id": "nw",
+        "param": "size",
+        "type": "xy",
+        "invert": "xy",
+        "ratio": "true"
+      },
+      {
+        "id": "t",
+        "param": "tail",
+        "type": "xy",
+        "icon": "dot"
+      },
+      {
+        "id": "tw",
+        "param": "tailWidth",
+        "type": "axis",
+        "style": "square",
+        "icon": "grip"
+      }
+    ],
+    "script": "\n\n        let handleAttraction = 3.5;\n\n        function getHandles(params) {\n            let width = params.size.x;\n            let height = params.size.y;\n            let tail = params.tail;\n            let r = Math.min(Math.max(0.0,params.cornerRadius),Math.min(width,height));\n            let pointOffs = r * (1.0-0.552228474);\n            let tailWidthHandle = null;\n\n            if( Math.abs(tail.y) <= Math.abs(tail.x) ) {\n\n                let minPos = -height + r\n                let maxPos = height - r\n                let tailHalfWidth = Math.min(params.tailWidth, maxPos - minPos) / 2;\n                let tailPos = tail.y * handleAttraction;\n                tailPos = Math.max(tailPos,minPos+tailHalfWidth);\n                tailPos = Math.min(tailPos,maxPos-tailHalfWidth);\n\n                if( tail.x < 0 ) {  // LEFT\n                    tailWidthHandle = {x:-width, y:tailPos+tailHalfWidth, axis:[0,1]};\n                } else {            // RIGHT\n                    tailWidthHandle = {x:width, y:tailPos+tailHalfWidth, axis:[0,1]};\n                }\n\n            } else {\n\n                let minPos = -width + r\n                let maxPos = width - r\n                let tailHalfWidth = Math.min(params.tailWidth, maxPos - minPos) / 2;\n                let tailPos = tail.x * handleAttraction;\n                tailPos = Math.max(tailPos,minPos+tailHalfWidth);\n                tailPos = Math.min(tailPos,maxPos-tailHalfWidth);\n\n                if( tail.y < 0 ) {  // TOP\n                    tailWidthHandle = {x:tailPos+tailHalfWidth, y:-height, axis:[1,0]};\n                } else {            // BOTTOM\n                    tailWidthHandle = {x:tailPos+tailHalfWidth, y:height, axis:[1,0]};\n                }\n\n            }\n\n            return {\n                tw: tailWidthHandle,\n                r: [-width + r, -height],\n                t: params.tail,\n                n: [0, -height],\n                s: [0, height],\n                e: [width, 0],\n                w: [-width, 0],\n                ne: [width, -height],\n                se: [width, height],\n                nw: [-width, -height],\n                sw: [-width, height]\n            }\n        }\n\n        function getPath(params) {\n            let width = params.size.x;\n            let height = params.size.y;\n            let tail = params.tail;\n            let r = Math.min(Math.max(0.0,params.cornerRadius),Math.min(width,height));\n            let pointOffs = r * (1.0-0.552228474);\n            let result = [\n\n                // TOP SIDE\n                {\n                    in: [-width + pointOffs, -height],\n                    p: [-width + r, -height]\n                },\n                // <-- Position for TOP tail (index 1)\n                {\n                    p: [width - r, -height],\n                    out: [width-pointOffs, -height]\n                },\n\n                // RIGHT SIDE\n                {\n                    in: [width, -height + pointOffs],\n                    p: [width, -height + r]\n                },\n                // <-- Position for RIGHT tail (index 3)\n                {\n                    p: [width, height-r],\n                    out: [width, height - pointOffs]\n                },\n\n                // BOTTOM SIDE\n                {\n                    in: [width-pointOffs, height],\n                    p: [width-r, height]\n                },\n                // <-- Position for BOTTOM tail (index 5)\n                {\n                    p: [-width + r, height],\n                    out: [-width + pointOffs, height]\n                },\n\n                // LEFT SIDE\n                {\n                    in: [-width, height-pointOffs],\n                    p: [-width, height-r]\n                },\n                // <-- Position for LEFT tail (index 7)\n                {\n                    p: [-width, -height + r],\n                    out: [-width, -height + pointOffs]\n                },\n\n\n                {closed:true}\n            ];\n\n            if( Math.abs(tail.y) <= Math.abs(tail.x) ) {\n\n                let minPos = -height + r\n                let maxPos = height - r\n                let tailHalfWidth = Math.min(params.tailWidth, maxPos - minPos) / 2;\n                let tailPos = tail.y * handleAttraction;\n                tailPos = Math.max(tailPos,minPos+tailHalfWidth);\n                tailPos = Math.min(tailPos,maxPos-tailHalfWidth);\n\n                if( tail.x < 0 ) {  // LEFT\n\n                    result.splice(7,0,\n                        [-width, tailPos+tailHalfWidth],\n                        [tail.x,tail.y],\n                        [-width, tailPos-tailHalfWidth]\n                    );\n\n                } else {            // RIGHT\n\n                    result.splice(3,0,\n                        [width, tailPos-tailHalfWidth],\n                        [tail.x,tail.y],\n                        [width, tailPos+tailHalfWidth]\n                    );\n\n                }\n\n            } else {\n\n                let minPos = -width + r\n                let maxPos = width - r\n                let tailHalfWidth = Math.min(params.tailWidth, maxPos - minPos) / 2;\n                let tailPos = tail.x * handleAttraction;\n                tailPos = Math.max(tailPos,minPos+tailHalfWidth);\n                tailPos = Math.min(tailPos,maxPos-tailHalfWidth);\n\n                if( tail.y < 0 ) {  // TOP\n\n                    result.splice(1,0,\n                        [tailPos-tailHalfWidth, -height],\n                        [tail.x,tail.y],\n                        [tailPos+tailHalfWidth, -height]\n                    )\n\n                } else {            // BOTTOM\n\n                    result.splice(5,0,\n                        [tailPos+tailHalfWidth, height],\n                        [tail.x,tail.y],\n                        [tailPos-tailHalfWidth, height]\n                    )\n\n                }\n\n            }\n\n            return result;\n\n        }\n\n    "
+  },
+  {
+    "id": "com.alightcreative.shapes.circle",
+    "name": "Circle",
+    "fileName": "circle.xml",
+    "params": [
+      {
+        "id": "size",
+        "label": "@am:string/effect_param_size",
+        "default": "100,100",
+        "type": "size",
+        "paramType": "point"
+      }
+    ],
+    "handles": [
+      {
+        "id": "e",
+        "param": "size",
+        "type": "x"
+      },
+      {
+        "id": "w",
+        "param": "size",
+        "type": "x",
+        "invert": "x"
+      },
+      {
+        "id": "n",
+        "param": "size",
+        "type": "y",
+        "invert": "y"
+      },
+      {
+        "id": "s",
+        "param": "size",
+        "type": "y"
+      },
+      {
+        "id": "se",
+        "param": "size",
+        "type": "xy",
+        "ratio": "true"
+      },
+      {
+        "id": "ne",
+        "param": "size",
+        "type": "xy",
+        "invert": "y",
+        "ratio": "true"
+      },
+      {
+        "id": "sw",
+        "param": "size",
+        "type": "xy",
+        "invert": "x",
+        "ratio": "true"
+      },
+      {
+        "id": "nw",
+        "param": "size",
+        "type": "xy",
+        "invert": "xy",
+        "ratio": "true"
+      }
+    ],
+    "script": "\n\n        function getHandles(params) {\n            return {\n                n: [0, -params.size.y],\n                s: [0, params.size.y],\n                e: [params.size.x, 0],\n                w: [-params.size.x, 0],\n                ne: [params.size.x, -params.size.y],\n                se: [params.size.x, params.size.y],\n                nw: [-params.size.x, -params.size.y],\n                sw: [-params.size.x, params.size.y]\n            }\n        }\n\n        function getPath(params) {\n            let width = params.size.x;\n            let height = params.size.y;\n            let cw = 0.551915024494 * width;\n            let ch = 0.551915024494 * height;\n            return [\n                {\n                    in:[-cw,-height],\n                    p:[0,-height],\n                    out:[cw,-height],\n                },\n                {\n                    in:[width,-ch],\n                    p:[width,0],\n                    out:[width,ch]\n                },\n                {\n                    in:[cw,height],\n                    p:[0,height],\n                    out:[-cw,height]\n                },\n                {\n                    in:[-width,ch],\n                    p:[-width,0],\n                    out:[-width,-ch]\n                },\n                {closed:true}\n            ];\n        }\n\n    "
+  },
+  {
+    "id": "com.alightcreative.shapes.line",
+    "name": "Line",
+    "fileName": "line.xml",
+    "params": [
+      {
+        "id": "p1",
+        "label": "@am:string/effect_param_point_1",
+        "default": "-100,100",
+        "paramType": "point"
+      },
+      {
+        "id": "p2",
+        "label": "@am:string/effect_param_point_2",
+        "default": "100,-100",
+        "paramType": "point"
+      }
+    ],
+    "handles": [
+      {
+        "id": "p1",
+        "param": "p1",
+        "type": "xy",
+        "icon": "dot"
+      },
+      {
+        "id": "p2",
+        "param": "p2",
+        "type": "xy",
+        "icon": "hollow-dot"
+      }
+    ],
+    "script": "\n\n        function getHandles(params) {\n            return {\n                p1: params.p1,\n                p2: params.p2\n            }\n        }\n\n        function getPath(params) {\n            return [\n                [params.p1.x,params.p1.y],\n                [params.p2.x,params.p2.y],\n                {closed:false}\n            ];\n        }\n\n    "
+  },
+  {
+    "id": "com.alightcreative.shapes.moon",
+    "name": "Moon",
+    "fileName": "moon.xml",
+    "params": [
+      {
+        "id": "radius",
+        "min": "0",
+        "max": "2000",
+        "default": "100",
+        "step": "1",
+        "label": "@am:string/effect_param_radius",
+        "paramType": "spinner"
+      },
+      {
+        "id": "offset",
+        "min": "0",
+        "max": "1000",
+        "default": "250",
+        "step": "1",
+        "label": "@am:string/effect_param_offset",
+        "paramType": "spinner"
+      }
+    ],
+    "handles": [
+      {
+        "id": "r",
+        "param": "radius",
+        "type": "radius",
+        "icon": "grip"
+      },
+      {
+        "id": "o",
+        "param": "offset",
+        "type": "x",
+        "style": "square",
+        "icon": "grip"
+      }
+    ],
+    "script": "\n\n        function getHandles(params) {\n            let radius = params.radius;\n            let width = radius;\n            let height = radius;\n            let offset = params.offset / 1000.0;\n            return {\n                r: [0, radius],\n                o: [-width + (2*width*offset),0]\n            }\n        }\n\n        function getPath(params) {\n            let radius = params.radius;\n            let offset = params.offset / 1000.0;\n            let width = radius;\n            let height = radius;\n            let cw = 0.551915024494 * width;\n            let ch = 0.551915024494 * height;\n            return [\n                {   // TOP\n                    in:[-cw,-height],\n                    p:[0,-height],\n                    out:[-cw + (2*cw*offset),-height],\n                },\n                {  // RIGHT\n                    in:[-width + (2*width*offset),-ch],\n                    p:[-width + (2*width*offset),0],\n                    out:[-width + (2*width*offset),ch]\n                },\n                {  // BOTTOM\n                    in:[-cw + (2*cw*offset),height],\n                    p:[0,height],\n                    out:[-cw,height]\n                },\n                {  // LEFT\n                    in:[-width,ch],\n                    p:[-width,0],\n                    out:[-width,-ch]\n                },\n                {closed:true}\n            ];\n        }\n\n    "
+  },
+  {
+    "id": "com.alightcreative.shapes.multifoil",
+    "name": "Multifoil",
+    "fileName": "multifoil.xml",
+    "params": [
+      {
+        "id": "pointCount",
+        "default": "5",
+        "min": "3",
+        "max": "32",
+        "label": "@am:string/effect_param_num_points",
+        "step": "1",
+        "type": "integer",
+        "ticks": "3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32",
+        "paramType": "slider"
+      },
+      {
+        "id": "outerRadius",
+        "min": "0",
+        "max": "2000",
+        "default": "100",
+        "step": "1",
+        "label": "@am:string/effect_param_radius_out",
+        "paramType": "spinner"
+      },
+      {
+        "id": "innerRadius",
+        "min": "0",
+        "max": "2000",
+        "default": "50",
+        "step": "1",
+        "label": "@am:string/effect_param_radius_in",
+        "paramType": "spinner"
+      },
+      {
+        "id": "offsetAngle",
+        "min": "-3600",
+        "max": "3600",
+        "default": "0",
+        "step": "1",
+        "label": "@am:string/effect_param_angle",
+        "ticks": "45,90,135,180,225,270",
+        "type": "angle",
+        "paramType": "spinner"
+      }
+    ],
+    "handles": [
+      {
+        "id": "in",
+        "param": "innerRadius",
+        "type": "radius",
+        "icon": "grip"
+      },
+      {
+        "id": "out",
+        "param": "outerRadius",
+        "type": "radius",
+        "icon": "grip"
+      },
+      {
+        "id": "a",
+        "param": "offsetAngle",
+        "type": "angle",
+        "icon": "grip"
+      }
+    ],
+    "script": "\n\n        function getHandles(params) {\n            let innerRadius = params.innerRadius;\n            let outerRadius = params.outerRadius;\n            let pointCount = params.pointCount;\n            let radsPerPoint = 2.0*Math.PI/pointCount;\n            let radsPerHalfPoint = radsPerPoint / 2.0;\n            let offsetAngle = params.offsetAngle * Math.PI / 180.0;\n\n            let outerHandleAngle = Math.PI/2.0 + offsetAngle - radsPerPoint * Math.floor(pointCount/3);\n            let innerHandleAngle = radsPerPoint * Math.floor(pointCount*2/3) + Math.PI/2.0 + offsetAngle - radsPerHalfPoint;\n\n            return {\n                in: [innerRadius*Math.cos(innerHandleAngle),innerRadius*-Math.sin(innerHandleAngle)],\n                out: [outerRadius*Math.cos(outerHandleAngle),outerRadius*-Math.sin(outerHandleAngle)],\n                a: [outerRadius*Math.cos(offsetAngle + Math.PI/2.0),outerRadius*-Math.sin(offsetAngle + Math.PI/2.0)],\n            }\n        }\n\n        function getPath(params) {\n            let innerRadius = params.innerRadius;\n            let outerRadius = params.outerRadius;\n            let pointCount = params.pointCount;\n            let offsetAngle = params.offsetAngle * Math.PI / 180.0;\n            let points = [];\n            let radsPerPoint = 2.0*Math.PI/pointCount;\n            let radsPerHalfPoint = radsPerPoint / 2.0;\n            let innerCirc = innerRadius * 2.0 * Math.PI;\n            let segLen = innerCirc / pointCount;\n            let pw = segLen / 2.0;\n            for( let i=0; i<pointCount; i++ ) {\n                let angle = radsPerPoint*i + Math.PI/2.0 + offsetAngle;\n                let x = outerRadius*Math.cos(angle);\n                let y = outerRadius*-Math.sin(angle);\n                let perpX = y;\n                let perpY = -x;\n                let perpLen = Math.hypot(perpX,perpY);\n                perpX /= perpLen;\n                perpY /= perpLen;\n                let x0 = x - perpX * pw;\n                let y0 = y - perpY * pw;\n                let x2 = x + perpX * pw;\n                let y2 = y + perpY * pw;\n                //points.push([x0,y0]);\n                //points.push([x,y]);\n                points.push({\n                    in:[x0,y0],\n                    p:[x,y],\n                    out:[x2,y2]\n                });\n                //points.push([x2,y2]);\n                angle += radsPerHalfPoint;\n                points.push([innerRadius*Math.cos(angle),innerRadius*-Math.sin(angle)]);\n            }\n            points.push({closed:true});\n            return points;\n        }\n\n    "
+  },
+  {
+    "id": "com.alightcreative.shapes.penta",
+    "name": "Penta",
+    "fileName": "penta.xml",
+    "params": [
+      {
+        "id": "p1",
+        "label": "@am:string/effect_param_point_1",
+        "default": "-100,-100",
+        "paramType": "point"
+      },
+      {
+        "id": "p2",
+        "label": "@am:string/effect_param_point_2",
+        "default": "0,-100",
+        "paramType": "point"
+      },
+      {
+        "id": "p3",
+        "label": "@am:string/effect_param_point_3",
+        "default": "0,0",
+        "paramType": "point"
+      },
+      {
+        "id": "p4",
+        "label": "@am:string/effect_param_point_4",
+        "default": "100,100",
+        "paramType": "point"
+      },
+      {
+        "id": "p5",
+        "label": "@am:string/effect_param_point_5",
+        "default": "-100,100",
+        "paramType": "point"
+      },
+      {
+        "id": "closed",
+        "default": "true",
+        "label": "@am:string/effect_param_closed",
+        "paramType": "switch"
+      }
+    ],
+    "handles": [
+      {
+        "id": "p1",
+        "param": "p1",
+        "type": "xy",
+        "icon": "hollow-dot"
+      },
+      {
+        "id": "p2",
+        "param": "p2",
+        "type": "xy",
+        "icon": "hollow-dot"
+      },
+      {
+        "id": "p3",
+        "param": "p3",
+        "type": "xy",
+        "icon": "hollow-dot"
+      },
+      {
+        "id": "p4",
+        "param": "p4",
+        "type": "xy",
+        "icon": "hollow-dot"
+      },
+      {
+        "id": "p5",
+        "param": "p5",
+        "type": "xy",
+        "icon": "hollow-dot"
+      }
+    ],
+    "script": "\n\n        function getHandles(params) {\n            return {\n                p1: params.p1,\n                p2: params.p2,\n                p3: params.p3,\n                p4: params.p4,\n                p5: params.p5\n            }\n        }\n\n        function getPath(params) {\n            return [\n                [params.p1.x,params.p1.y],\n                [params.p2.x,params.p2.y],\n                [params.p3.x,params.p3.y],\n                [params.p4.x,params.p4.y],\n                [params.p5.x,params.p5.y],\n                {closed:params.closed}\n            ];\n        }\n\n    "
+  },
+  {
+    "id": "com.alightcreative.shapes.pie",
+    "name": "Pie",
+    "fileName": "pie.xml",
+    "params": [
+      {
+        "id": "startAngle",
+        "min": "-3600",
+        "max": "3600",
+        "default": "45",
+        "step": "1",
+        "label": "@am:string/effect_param_start",
+        "ticks": "0,45,90,135,180,225,270,315,360",
+        "type": "angle",
+        "paramType": "spinner"
+      },
+      {
+        "id": "endAngle",
+        "min": "-3600",
+        "max": "3600",
+        "default": "90",
+        "step": "1",
+        "label": "@am:string/effect_param_end",
+        "ticks": "0,45,90,135,180,225,270,315,360",
+        "type": "angle",
+        "paramType": "spinner"
+      },
+      {
+        "id": "radius",
+        "min": "0",
+        "max": "2000",
+        "default": "100",
+        "step": "1",
+        "label": "@am:string/effect_param_radius",
+        "paramType": "spinner"
+      }
+    ],
+    "handles": [
+      {
+        "id": "r",
+        "param": "radius",
+        "type": "radius",
+        "style": "round",
+        "icon": "grip"
+      },
+      {
+        "id": "s",
+        "param": "startAngle",
+        "type": "angle",
+        "style": "square",
+        "icon": "grip"
+      },
+      {
+        "id": "e",
+        "param": "endAngle",
+        "type": "angle",
+        "style": "square",
+        "icon": "grip"
+      }
+    ],
+    "script": "\n\n        function getHandles(params) {\n\n            let startAngle = params.startAngle * Math.PI / 180\n            let endAngle = params.endAngle * Math.PI / 180\n            let radius = params.radius;\n\n            startAngle += 2000 * Math.PI;\n            endAngle += 2000 * Math.PI;\n            //startAngle %= 2.0 * Math.PI;\n            //endAngle %= 2.0 * Math.PI;\n\n            //let radiusHandle = [radius,0];\n            //let rightHandleOK = Math.abs(startAngle) > Math.PI / 3 && Math.abs(endAngle) > Math.PI / 3 && Math.abs(startAngle-Math.PI*2.0) > Math.PI / 3 && Math.abs(endAngle-Math.PI*2.0) > Math.PI / 3;\n            //let leftHandleOK = Math.abs(startAngle-Math.PI) > Math.PI / 4 && Math.abs(endAngle-Math.PI) > Math.PI / 4;\n            //let topHandleOK = Math.abs(startAngle-Math.PI/2) > Math.PI / 4 && Math.abs(endAngle-Math.PI/2) > Math.PI / 4;\n            //\n            //if( rightHandleOK ) {\n            //    radiusHandle = [radius,0];\n            //} else if( leftHandleOK ) {\n            //    radiusHandle = [-radius,0];\n            //} else if( topHandleOK ) {\n            //    radiusHandle = [0,-radius];\n            //}\n\n            let radiusAngle = (startAngle+endAngle)/2.0 + Math.PI;\n\n            return {\n                r: [radius*Math.cos(radiusAngle),radius*-Math.sin(radiusAngle)],\n                s: [radius*Math.cos(startAngle),radius*-Math.sin(startAngle)],\n                e: [radius*Math.cos(endAngle),radius*-Math.sin(endAngle)]\n            }\n        }\n\n        /**\n         * Create a series of arcs approximating a circular arc around (0,0)\n         * with radius radius and the given startAngle and endAngle (angles\n         * considered counter-clockwise from the x axis).\n        */\n        function createArc(radius, startAngle, endAngle) {\n            let twoPI = Math.PI * 2;\n            let angleDiff = (endAngle - startAngle) % twoPI;\n            let startAngleN = Math.abs(startAngle) > twoPI ? startAngle % twoPI : startAngle;\n            let endAngleN = startAngleN + angleDiff; //Math.abs(endAngle) > twoPI ? endAngle % twoPI : endAngle;\n            let curves = [];\n            let piOverTwo = Math.PI / 2.0;\n            let sgn = (startAngle < endAngle) ? +1 : -1; // clockwise or counterclockwise\n            let a1 = startAngle;\n\n            //AM.log(`PieShape createArc: sgn=${sgn}`);\n\n            //if( (startAngle < endAngle) != (startAngleN < endAngleN) ) {\n            //    [startAngleN,endAngleN] = [endAngleN,startAngleN];\n            //}\n\n            for (var totalAngle = Math.min(twoPI, Math.abs(endAngleN - startAngleN)); totalAngle > 0.00001; ) {\n                var a2 = a1 + sgn * Math.min(totalAngle, piOverTwo);\n                curves.push(createSmallArc(radius, a1, a2));\n                totalAngle -= Math.abs(a2 - a1);\n                a1 = a2;\n            }\n\n            return curves;\n        }\n\n        /**\n         * Cubic bezier approximation of a circular arc centered at teh origin,\n         * from (radians) a1 to a2, where a2 - a1 < pi / 2. The arc's radius is r.\n         *\n         * Returns an object with four points, where x1, y1, and x4, y4 are the arc's\n         * end points and x2, y2 and x3, y3 are the cubic bezier's control points.\n         *\n         * This algorithm is based on teh approach described in:\n         * A. Riskus, \"Approximation of a cubic Bezier Curbe by Circular Arcs and Vice Versa,\"\n         * Information Technology and Control, 35(4) 2006 pp. 371-378.\n         *\n         * create[Small]Arc translated from the original AS version by Hans Muller\n         * https://hansmuller-flex.blogspot.com/2011/10/more-about-approximating-circular-arcs.html\n         * Licensed under Creative Commons 3.0 by Attribution\n         * http://creativecommons.org/licenses/by/3.0/\n         */\n        function createSmallArc(r, a1, a2) {\n          // compute for an arc of the same angle, but centered around the x-axis\n          var\n          a = (a2 - a1) / 2.0,\n\n          x4 = r * Math.cos(a),\n          y4 = r * Math.sin(a),\n          x1 = x4,\n          y1 = -y4,\n\n          q1 = x1 * x1 + y1 * y1,\n          q2 = q1 + x1 * x4 + y1 * y4,\n          k2 = 4/3 * (Math.sqrt(2 * q1 * q2) - q2) / (x1 * y4 - y1 * x4),\n\n          x2 = x1 - k2 * y1,\n          y2 = y1 + k2 * x1,\n          x3 = x2,\n          y3 = -y2,\n\n          ar = a + a1,\n          cos_ar = Math.cos(ar),\n          sin_ar = Math.sin(ar);\n\n          return {\n            'x1': r * Math.cos(a1),\n            'y1': r * Math.sin(a1),\n            'x2': x2 * cos_ar - y2 * sin_ar,\n            'y2': x2 * sin_ar + y2 * cos_ar,\n            'x3': x3 * cos_ar - y3 * sin_ar,\n            'y3': x3 * sin_ar + y3 * cos_ar,\n            'x4': r * Math.cos(a2),\n            'y4': r * Math.sin(a2)\n          };\n        }\n\n        function posMod(x,m) {return (x % m + m) % m}\n\n        function getPath(params) {\n\n            let startAngle = -params.startAngle * Math.PI / 180\n            let endAngle = -params.endAngle * Math.PI / 180\n            let radius = params.radius;\n            startAngle += 2000 * Math.PI;\n            endAngle += 2000 * Math.PI;\n\n            let lowAngle = Math.min(startAngle,endAngle)\n            let highAngle = Math.max(startAngle,endAngle)\n            let diff = ((highAngle - lowAngle)/(Math.PI*2.0)) % 2.0;\n\n            lowAngle %= (Math.PI*2.0);\n            highAngle %= (Math.PI*2.0);\n\n            if( diff < 1.0 ) {\n                lowAngle += Math.PI*2.0;\n            } else {\n                highAngle += Math.PI*2.0;\n            }\n\n            let curves = createArc(radius,lowAngle,highAngle)\n\n            let xscale = 1.0;\n            let points = []\n            for( let i=0; i<curves.length; i++ ) {\n                let c = curves[i]\n                if( points.length > 0 ) {\n                    points[points.length-1].out = [c.x2 * xscale, c.y2];\n                } else {\n                    points.push({p:[c.x1 * xscale,c.y1], out:[c.x2 * xscale,c.y2]})\n                }\n                points.push({in:[c.x3 * xscale,c.y3], p:[c.x4 * xscale,c.y4]})\n            }\n            points.push([0,0]);\n            points.push({closed:true})\n            return points;\n\n\n        }\n\n    "
+  },
+  {
+    "id": "com.alightcreative.shapes.plus",
+    "name": "Plus",
+    "fileName": "plus.xml",
+    "params": [
+      {
+        "id": "size",
+        "label": "@am:string/effect_param_size",
+        "default": "100,100",
+        "type": "size",
+        "paramType": "point"
+      },
+      {
+        "id": "stemSize",
+        "min": "0",
+        "max": "2000",
+        "default": "50",
+        "step": "1",
+        "label": "@am:string/effect_param_width",
+        "paramType": "spinner"
+      }
+    ],
+    "handles": [
+      {
+        "id": "e",
+        "param": "size",
+        "type": "x"
+      },
+      {
+        "id": "w",
+        "param": "size",
+        "type": "x",
+        "invert": "x"
+      },
+      {
+        "id": "n",
+        "param": "size",
+        "type": "y",
+        "invert": "y"
+      },
+      {
+        "id": "s",
+        "param": "size",
+        "type": "y"
+      },
+      {
+        "id": "se",
+        "param": "size",
+        "type": "xy",
+        "ratio": "true"
+      },
+      {
+        "id": "ne",
+        "param": "size",
+        "type": "xy",
+        "invert": "y",
+        "ratio": "true"
+      },
+      {
+        "id": "sw",
+        "param": "size",
+        "type": "xy",
+        "invert": "x",
+        "ratio": "true"
+      },
+      {
+        "id": "nw",
+        "param": "size",
+        "type": "xy",
+        "invert": "xy",
+        "ratio": "true"
+      },
+      {
+        "id": "ss",
+        "param": "stemSize",
+        "type": "x",
+        "style": "square",
+        "icon": "grip"
+      }
+    ],
+    "script": "\n\n        function getHandles(params) {\n            let stemSize = params.stemSize;\n            return {\n                ss: [stemSize/2, stemSize/2],\n                n: [0, -params.size.y],\n                s: [0, params.size.y],\n                e: [params.size.x, 0],\n                w: [-params.size.x, 0],\n                ne: [params.size.x, -params.size.y],\n                se: [params.size.x, params.size.y],\n                nw: [-params.size.x, -params.size.y],\n                sw: [-params.size.x, params.size.y]\n            }\n        }\n\n        function getPath(params) {\n            let width = params.size.x;\n            let height = params.size.y;\n            let stemSize = params.stemSize;\n            return [\n                [-stemSize/2,-height],\n                [stemSize/2,-height],\n                [stemSize/2,-stemSize/2],\n                [width,-stemSize/2],\n                [width,stemSize/2],\n                [stemSize/2,stemSize/2],\n                [stemSize/2,height],\n                [-stemSize/2,height],\n                [-stemSize/2,stemSize/2],\n                [-width,stemSize/2],\n                [-width,-stemSize/2],\n                [-stemSize/2,-stemSize/2],\n                {closed:true}\n            ];\n        }\n\n    "
+  },
+  {
+    "id": "com.alightcreative.shapes.poly",
+    "name": "Poly",
+    "fileName": "poly.xml",
+    "params": [
+      {
+        "id": "sideCount",
+        "default": "6",
+        "min": "3",
+        "max": "32",
+        "label": "@am:string/effect_param_num_sides",
+        "step": "1",
+        "type": "integer",
+        "ticks": "3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32",
+        "paramType": "slider"
+      },
+      {
+        "id": "radius",
+        "min": "0",
+        "max": "2000",
+        "default": "100",
+        "step": "1",
+        "label": "@am:string/effect_param_radius",
+        "paramType": "spinner"
+      },
+      {
+        "id": "offsetAngle",
+        "min": "-3600",
+        "max": "3600",
+        "default": "0",
+        "step": "1",
+        "label": "@am:string/effect_param_angle",
+        "ticks": "45,90,135,180,225,270",
+        "type": "angle",
+        "paramType": "spinner"
+      }
+    ],
+    "handles": [
+      {
+        "id": "r",
+        "param": "radius",
+        "type": "radius",
+        "icon": "grip"
+      },
+      {
+        "id": "a",
+        "param": "offsetAngle",
+        "type": "angle",
+        "icon": "grip"
+      }
+    ],
+    "script": "\n\n        function getHandles(params) {\n            let radius = params.radius;\n            let sideCount = params.sideCount;\n            let radsPerSide = 2.0*Math.PI/sideCount;\n            let offsetAngle = params.offsetAngle * Math.PI / 180.0;\n\n            let handleAngle = Math.PI/2.0 + offsetAngle - radsPerSide * Math.floor(sideCount/3);\n\n            return {\n                r: [radius*Math.cos(handleAngle),radius*-Math.sin(handleAngle)],\n                a: [radius*Math.cos(offsetAngle + Math.PI/2.0),radius*-Math.sin(offsetAngle + Math.PI/2.0)],\n            }\n        }\n\n        function getPath(params) {\n            let radius = params.radius;\n            let sideCount = params.sideCount;\n            let offsetAngle = params.offsetAngle * Math.PI / 180.0;\n            let points = [];\n            let radsPerSide = 2.0*Math.PI/sideCount;\n            for( let i=0; i<sideCount; i++ ) {\n                let angle = radsPerSide*i + Math.PI/2.0 + offsetAngle;\n                points.push([radius*Math.cos(angle),radius*-Math.sin(angle)]);\n\n            }\n            points.push({closed:true});\n            return points;\n        }\n\n    "
+  },
+  {
+    "id": "com.alightcreative.shapes.quad",
+    "name": "Quad",
+    "fileName": "quad.xml",
+    "params": [
+      {
+        "id": "p1",
+        "label": "@am:string/effect_param_point_1",
+        "default": "-100,-100",
+        "paramType": "point"
+      },
+      {
+        "id": "p2",
+        "label": "@am:string/effect_param_point_2",
+        "default": "50,-100",
+        "paramType": "point"
+      },
+      {
+        "id": "p3",
+        "label": "@am:string/effect_param_point_3",
+        "default": "100,100",
+        "paramType": "point"
+      },
+      {
+        "id": "p4",
+        "label": "@am:string/effect_param_point_4",
+        "default": "-100,100",
+        "paramType": "point"
+      },
+      {
+        "id": "closed",
+        "default": "true",
+        "label": "@am:string/effect_param_closed",
+        "paramType": "switch"
+      }
+    ],
+    "handles": [
+      {
+        "id": "p1",
+        "param": "p1",
+        "type": "xy",
+        "icon": "hollow-dot"
+      },
+      {
+        "id": "p2",
+        "param": "p2",
+        "type": "xy",
+        "icon": "hollow-dot"
+      },
+      {
+        "id": "p3",
+        "param": "p3",
+        "type": "xy",
+        "icon": "hollow-dot"
+      },
+      {
+        "id": "p4",
+        "param": "p4",
+        "type": "xy",
+        "icon": "hollow-dot"
+      }
+    ],
+    "script": "\n\n        function getHandles(params) {\n            return {\n                p1: params.p1,\n                p2: params.p2,\n                p3: params.p3,\n                p4: params.p4\n            }\n        }\n\n        function getPath(params) {\n            return [\n                [params.p1.x,params.p1.y],\n                [params.p2.x,params.p2.y],\n                [params.p3.x,params.p3.y],\n                [params.p4.x,params.p4.y],\n                {closed:params.closed}\n            ];\n        }\n\n    "
+  },
+  {
+    "id": "com.alightcreative.shapes.rect",
+    "name": "Rect",
+    "fileName": "rect.xml",
+    "params": [
+      {
+        "id": "size",
+        "label": "@am:string/effect_param_size",
+        "default": "100,100",
+        "type": "size",
+        "paramType": "point"
+      }
+    ],
+    "handles": [
+      {
+        "id": "e",
+        "param": "size",
+        "type": "x"
+      },
+      {
+        "id": "w",
+        "param": "size",
+        "type": "x",
+        "invert": "x"
+      },
+      {
+        "id": "n",
+        "param": "size",
+        "type": "y",
+        "invert": "y"
+      },
+      {
+        "id": "s",
+        "param": "size",
+        "type": "y"
+      },
+      {
+        "id": "se",
+        "param": "size",
+        "type": "xy",
+        "ratio": "true"
+      },
+      {
+        "id": "ne",
+        "param": "size",
+        "type": "xy",
+        "invert": "y",
+        "ratio": "true"
+      },
+      {
+        "id": "sw",
+        "param": "size",
+        "type": "xy",
+        "invert": "x",
+        "ratio": "true"
+      },
+      {
+        "id": "nw",
+        "param": "size",
+        "type": "xy",
+        "invert": "xy",
+        "ratio": "true"
+      }
+    ],
+    "script": "\n\n        function getHandles(params) {\n            return {\n                n: [0, -params.size.y],\n                s: [0, params.size.y],\n                e: [params.size.x, 0],\n                w: [-params.size.x, 0],\n                ne: [params.size.x, -params.size.y],\n                se: [params.size.x, params.size.y],\n                nw: [-params.size.x, -params.size.y],\n                sw: [-params.size.x, params.size.y]\n            }\n        }\n\n        function getPath(params) {\n            let width = params.size.x;\n            let height = params.size.y;\n            return [\n                [-width,-height],\n                [width,-height],\n                [width,height],\n                [-width,height],\n                {closed:true}\n            ];\n        }\n\n    "
+  },
+  {
+    "id": "com.alightcreative.shapes.rect_1920_1080",
+    "name": "Rectangle 1920X1080",
+    "fileName": "rect_1920x1080.xml",
+    "params": [
+      {
+        "id": "size",
+        "label": "@am:string/effect_param_size",
+        "default": "960,540",
+        "type": "size",
+        "paramType": "point"
+      }
+    ],
+    "handles": [
+      {
+        "id": "e",
+        "param": "size",
+        "type": "x"
+      },
+      {
+        "id": "w",
+        "param": "size",
+        "type": "x",
+        "invert": "x"
+      },
+      {
+        "id": "n",
+        "param": "size",
+        "type": "y",
+        "invert": "y"
+      },
+      {
+        "id": "s",
+        "param": "size",
+        "type": "y"
+      },
+      {
+        "id": "se",
+        "param": "size",
+        "type": "xy",
+        "ratio": "true"
+      },
+      {
+        "id": "ne",
+        "param": "size",
+        "type": "xy",
+        "invert": "y",
+        "ratio": "true"
+      },
+      {
+        "id": "sw",
+        "param": "size",
+        "type": "xy",
+        "invert": "x",
+        "ratio": "true"
+      },
+      {
+        "id": "nw",
+        "param": "size",
+        "type": "xy",
+        "invert": "xy",
+        "ratio": "true"
+      }
+    ],
+    "script": "\n\n        function getHandles(params) {\n            return {\n                n: [0, -params.size.y],\n                s: [0, params.size.y],\n                e: [params.size.x, 0],\n                w: [-params.size.x, 0],\n                ne: [params.size.x, -params.size.y],\n                se: [params.size.x, params.size.y],\n                nw: [-params.size.x, -params.size.y],\n                sw: [-params.size.x, params.size.y]\n            }\n        }\n\n        function getPath(params) {\n            let width = params.size.x;\n            let height = params.size.y;\n            return [\n                [-width,-height],\n                [width,-height],\n                [width,height],\n                [-width,height],\n                {closed:true}\n            ];\n        }\n\n    "
+  },
+  {
+    "id": "com.alightcreative.shapes.roundrect",
+    "name": "Roundrect",
+    "fileName": "roundrect.xml",
+    "params": [
+      {
+        "id": "size",
+        "label": "@am:string/effect_param_size",
+        "default": "100,100",
+        "type": "size",
+        "paramType": "point"
+      },
+      {
+        "id": "cornerRadius",
+        "min": "0",
+        "max": "2000",
+        "default": "25",
+        "step": "1",
+        "label": "@am:string/effect_param_radius",
+        "paramType": "spinner"
+      }
+    ],
+    "handles": [
+      {
+        "id": "r",
+        "param": "cornerRadius",
+        "type": "x",
+        "style": "square",
+        "icon": "grip"
+      },
+      {
+        "id": "e",
+        "param": "size",
+        "type": "x"
+      },
+      {
+        "id": "w",
+        "param": "size",
+        "type": "x",
+        "invert": "x"
+      },
+      {
+        "id": "n",
+        "param": "size",
+        "type": "y",
+        "invert": "y"
+      },
+      {
+        "id": "s",
+        "param": "size",
+        "type": "y"
+      },
+      {
+        "id": "se",
+        "param": "size",
+        "type": "xy",
+        "ratio": "true"
+      },
+      {
+        "id": "ne",
+        "param": "size",
+        "type": "xy",
+        "invert": "y",
+        "ratio": "true"
+      },
+      {
+        "id": "sw",
+        "param": "size",
+        "type": "xy",
+        "invert": "x",
+        "ratio": "true"
+      },
+      {
+        "id": "nw",
+        "param": "size",
+        "type": "xy",
+        "invert": "xy",
+        "ratio": "true"
+      }
+    ],
+    "script": "\n\n        function getHandles(params) {\n            let width = params.size.x;\n            let height = params.size.y;\n            let r = Math.min(Math.max(0.0,params.cornerRadius),Math.min(width,height));\n\n            return {\n                r: [-width + r, -height],\n                n: [0, -height],\n                s: [0, height],\n                e: [width, 0],\n                w: [-width, 0],\n                ne: [width, -height],\n                se: [width, height],\n                nw: [-width, -height],\n                sw: [-width, height]\n            }\n        }\n\n        function getPath(params) {\n            let width = params.size.x;\n            let height = params.size.y;\n            let r = Math.min(Math.max(0.0,params.cornerRadius),Math.min(width,height));\n            let pointOffs = r * (1.0-0.552228474);\n            return [\n                {\n                    p: [-width + r, -height],\n                    in: [-width + pointOffs, -height]\n                },\n                {\n                    p: [width - r, -height],\n                    out: [width-pointOffs, -height]\n                },\n                {\n                    p: [width, -height + r],\n                    in: [width, -height + pointOffs]\n                },\n                {\n                    p: [width, height-r],\n                    out: [width, height - pointOffs]\n                },\n                {\n                    p: [width-r, height],\n                    in: [width-pointOffs, height]\n                },\n                {\n                    p: [-width + r, height],\n                    out: [-width + pointOffs, height]\n                },\n                {\n                    p: [-width, height-r],\n                    in: [-width, height-pointOffs]\n                },\n                {\n                    p: [-width, -height + r],\n                    out: [-width, -height + pointOffs]\n                },\n                {closed:true}\n            ];\n        }\n\n    "
+  },
+  {
+    "id": "com.alightcreative.shapes.roundrect_r16",
+    "name": "Rounded Rect (R16)",
+    "fileName": "roundrect_radius_16.xml",
+    "params": [
+      {
+        "id": "size",
+        "label": "@am:string/effect_param_size",
+        "default": "100,100",
+        "type": "size",
+        "paramType": "point"
+      },
+      {
+        "id": "cornerRadius",
+        "min": "0",
+        "max": "2000",
+        "default": "16",
+        "step": "1",
+        "label": "@am:string/effect_param_radius",
+        "paramType": "spinner"
+      }
+    ],
+    "handles": [
+      {
+        "id": "r",
+        "param": "cornerRadius",
+        "type": "x",
+        "style": "square",
+        "icon": "grip"
+      },
+      {
+        "id": "e",
+        "param": "size",
+        "type": "x"
+      },
+      {
+        "id": "w",
+        "param": "size",
+        "type": "x",
+        "invert": "x"
+      },
+      {
+        "id": "n",
+        "param": "size",
+        "type": "y",
+        "invert": "y"
+      },
+      {
+        "id": "s",
+        "param": "size",
+        "type": "y"
+      },
+      {
+        "id": "se",
+        "param": "size",
+        "type": "xy",
+        "ratio": "true"
+      },
+      {
+        "id": "ne",
+        "param": "size",
+        "type": "xy",
+        "invert": "y",
+        "ratio": "true"
+      },
+      {
+        "id": "sw",
+        "param": "size",
+        "type": "xy",
+        "invert": "x",
+        "ratio": "true"
+      },
+      {
+        "id": "nw",
+        "param": "size",
+        "type": "xy",
+        "invert": "xy",
+        "ratio": "true"
+      }
+    ],
+    "script": "\n        function getHandles(params) {\n            let width = params.size.x;\n            let height = params.size.y;\n            let r = Math.min(Math.max(0.0,params.cornerRadius),Math.min(width,height));\n            return { r: [-width + r, -height], n: [0, -height], s: [0, height], e: [width, 0], w: [-width, 0], ne: [width, -height], se: [width, height], nw: [-width, -height], sw: [-width, height] }\n        }\n        function getPath(params) {\n            let width = params.size.x;\n            let height = params.size.y;\n            let r = Math.min(Math.max(0.0,params.cornerRadius),Math.min(width,height));\n            let pointOffs = r * (1.0-0.552228474);\n            return [\n                { p: [-width + r, -height], in: [-width + pointOffs, -height] },\n                { p: [width - r, -height], out: [width-pointOffs, -height] },\n                { p: [width, -height + r], in: [width, -height + pointOffs] },\n                { p: [width, height-r], out: [width, height - pointOffs] },\n                { p: [width-r, height], in: [width-pointOffs, height] },\n                { p: [-width + r, height], out: [-width + pointOffs, height] },\n                { p: [-width, height-r], in: [-width, height-pointOffs] },\n                { p: [-width, -height + r], out: [-width, -height + pointOffs] },\n                {closed:true}\n            ];\n        }\n    "
+  },
+  {
+    "id": "com.alightcreative.shapes.samurai_sword",
+    "name": "Samurai Sword",
+    "fileName": "samurai_sword.xml",
+    "params": [
+      {
+        "id": "size",
+        "label": "@am:string/effect_param_size",
+        "default": "500,20",
+        "type": "size",
+        "paramType": "point"
+      },
+      {
+        "id": "guard",
+        "min": "0",
+        "max": "400",
+        "default": "40",
+        "step": "1",
+        "label": "Guard",
+        "paramType": "spinner"
+      },
+      {
+        "id": "handle",
+        "min": "0",
+        "max": "1000",
+        "default": "150",
+        "step": "1",
+        "label": "Handle",
+        "paramType": "spinner"
+      },
+      {
+        "id": "tip",
+        "min": "0",
+        "max": "400",
+        "default": "30",
+        "step": "1",
+        "label": "Tip",
+        "paramType": "spinner"
+      }
+    ],
+    "handles": [
+      {
+        "id": "e",
+        "param": "size",
+        "type": "x"
+      },
+      {
+        "id": "w",
+        "param": "size",
+        "type": "x",
+        "invert": "x"
+      },
+      {
+        "id": "n",
+        "param": "size",
+        "type": "y",
+        "invert": "y"
+      },
+      {
+        "id": "s",
+        "param": "size",
+        "type": "y"
+      }
+    ],
+    "script": "\n        function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }\n\n        function getHandles(params) {\n            return {\n                n: [0, -params.size.y],\n                s: [0, params.size.y],\n                e: [params.size.x, 0],\n                w: [-params.size.x, 0]\n            }\n        }\n\n        // Sword is drawn horizontally, centered at origin.\n        // Left side = pommel end of handle, right side = blade tip.\n        function getPath(params) {\n            let L = params.size.x;      // half total length span for main body (blade+some)\n            let H = params.size.y;      // half thickness\n            let guard = clamp(params.guard, 0, L*2);\n            let handle = clamp(params.handle, 0, L*2);\n            let tip = clamp(params.tip, 0, L*2);\n\n            // Effective placements\n            let left = -L - handle;         // end of handle (pommel)\n            let guardCenter = -L + guard;   // guard region near blade root\n            let bladeRoot = -L;             // start of blade\n            let right = L;                  // near tip start\n            let tipLen = tip;               // triangular tip length\n\n            // guard height protrudes a bit beyond body thickness\n            let guardH = H * 1.6;\n            let handleH = H * 0.8;          // handle slightly thinner than blade body\n\n            // Path outline (clockwise) starting from top of pommel moving to tip\n            // Segments: handle -> guard -> blade -> tip triangle -> back along bottom\n            let topHandleY = -handleH;\n            let botHandleY = handleH;\n            let topBladeY = -H;\n            let botBladeY = H;\n\n            return [\n                // Top edge from left to right\n                [left, topHandleY],                          // pommel top\n                [bladeRoot - handle*0.2, topHandleY],        // handle section\n                [guardCenter - guard*0.5, -guardH],          // left flare of guard\n                [guardCenter + guard*0.5, -guardH],          // right flare of guard\n                [bladeRoot + guard*0.6, topBladeY],          // transition to blade thickness\n                [right - tipLen, topBladeY],                 // approach tip start\n                [right, 0],                                  // tip point\n                // Bottom edge returning leftwards\n                [right - tipLen, botBladeY],\n                [bladeRoot + guard*0.6, botBladeY],\n                [guardCenter + guard*0.5, guardH],\n                [guardCenter - guard*0.5, guardH],\n                [bladeRoot - handle*0.2, botHandleY],\n                [left, botHandleY],\n                {closed:true}\n            ];\n        }\n    "
+  },
+  {
+    "id": "com.alightcreative.shapes.samurai_sword_vector",
+    "name": "Samurai Sword (Svg)",
+    "fileName": "samurai_sword_vector.xml",
+    "params": [
+      {
+        "id": "size",
+        "label": "@am:string/effect_param_size",
+        "default": "100,20",
+        "type": "size",
+        "paramType": "point"
+      }
+    ],
+    "handles": [
+      {
+        "id": "e",
+        "param": "size",
+        "type": "x"
+      },
+      {
+        "id": "w",
+        "param": "size",
+        "type": "x",
+        "invert": "x"
+      },
+      {
+        "id": "n",
+        "param": "size",
+        "type": "y",
+        "invert": "y"
+      },
+      {
+        "id": "s",
+        "param": "size",
+        "type": "y"
+      },
+      {
+        "id": "se",
+        "param": "size",
+        "type": "xy",
+        "ratio": "true"
+      },
+      {
+        "id": "ne",
+        "param": "size",
+        "type": "xy",
+        "invert": "y",
+        "ratio": "true"
+      },
+      {
+        "id": "sw",
+        "param": "size",
+        "type": "xy",
+        "invert": "x",
+        "ratio": "true"
+      },
+      {
+        "id": "nw",
+        "param": "size",
+        "type": "xy",
+        "invert": "xy",
+        "ratio": "true"
+      }
+    ],
+    "script": "\n        // Minimal SVG path parser for M/m, L/l, H/h, V/v, Z/z.\n        // Converts pathData into a polygonal chain.\n        const pathData = \"M80.832 10.368h35.328l-14.944 11.68h-57.728l-1.632 -2.24 -1.248 -1.056 -1.568 -0.704 -1.44 -0.256 -0.96 -0.128 -0.608 0.352 -2.336 0.448 -1.472 -0.768 -1.088 0.224 -0.576 8.928h-0.8l-3.008 -9.088 -1.92 -1.248h-16.032l-0.48 0.32 -0.48 0.416 -0.288 0.416h-2.88l-0.736 -0.864v-5.152l1.44 -0.736h2.432l0.992 1.28h15.84l3.52 -1.76h14.752l0.448 -0.672h4.672l1.568 1.76h29.568zM61.76 19.2v-1.248h-9.28v1.248h9.28zM65.056 19.2h33.376l-1.024 -1.248h-32.352v1.248zM99.84 17.472l4 -2.976v-0.672h-4.032v2.048l-0.704 0.64z\";\n        const viewportWidth = 120;\n        const viewportHeight = 120;\n        const groupTranslateX = 0;\n        const groupTranslateY = 44;\n\n        function tokenize(d){\n            const tokens = [];\n            let i=0;\n            const isCmd = c => /[MmLlHhVvZz]/.test(c);\n            const isNum = c => /[0-9+\\-.eE]/.test(c);\n            while(i<d.length){\n                const c=d[i];\n                if(isCmd(c)) { tokens.push({t:'cmd',v:c}); i++; continue; }\n                if(isNum(c)){\n                    let j=i+1;\n                    while(j<d.length && isNum(d[j])) j++;\n                    tokens.push({t:'num',v:parseFloat(d.slice(i,j))});\n                    i=j; continue;\n                }\n                i++;\n            }\n            return tokens;\n        }\n\n        function parsePath(d){\n            const tks = tokenize(d);\n            let i=0, cmd='M';\n            let x=0,y=0, sx=0, sy=0;\n            const points=[];\n            function addPoint(px,py){ points.push([px,py]); }\n            while(i<tks.length){\n                const tk=tks[i++];\n                if(!tk) break;\n                if(tk.t==='cmd'){ cmd=tk.v; if(cmd==='Z'||cmd==='z'){ addPoint(sx,sy); continue; } }\n                else { i--; }\n                switch(cmd){\n                    case 'M':{\n                        const nx=tks[i++].v; const ny=tks[i++].v;\n                        x=nx; y=ny; sx=x; sy=y; addPoint(x,y);\n                        cmd='L';\n                        break;\n                    }\n                    case 'm':{\n                        const dx=tks[i++].v; const dy=tks[i++].v;\n                        x+=dx; y+=dy; sx=x; sy=y; addPoint(x,y);\n                        cmd='l';\n                        break;\n                    }\n                    case 'L':{\n                        const nx=tks[i++].v; const ny=tks[i++].v;\n                        x=nx; y=ny; addPoint(x,y); break;\n                    }\n                    case 'l':{\n                        const dx=tks[i++].v; const dy=tks[i++].v;\n                        x+=dx; y+=dy; addPoint(x,y); break;\n                    }\n                    case 'H':{\n                        const nx=tks[i++].v; x=nx; addPoint(x,y); break;\n                    }\n                    case 'h':{\n                        const dx=tks[i++].v; x+=dx; addPoint(x,y); break;\n                    }\n                    case 'V':{\n                        const ny=tks[i++].v; y=ny; addPoint(x,y); break;\n                    }\n                    case 'v':{\n                        const dy=tks[i++].v; y+=dy; addPoint(x,y); break;\n                    }\n                    case 'Z': case 'z':{\n                        addPoint(sx,sy); break;\n                    }\n                    default: {\n                        // Unsupported commands ignored\n                        break;\n                    }\n                }\n            }\n            return points;\n        }\n\n        function centerAndScale(rawPts, params){\n            // apply group translate\n            const pts = rawPts.map(([px,py])=>[px+groupTranslateX, py+groupTranslateY]);\n            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;\n            for(const [px,py] of pts){ if(px<minX)minX=px; if(px>maxX)maxX=px; if(py<minY)minY=py; if(py>maxY)maxY=py; }\n            const cx = (minX+maxX)/2;\n            const cy = (minY+maxY)/2;\n            const halfW = (maxX-minX)/2 || 1;\n            const halfH = (maxY-minY)/2 || 1;\n            const sx = params.size.x / halfW;\n            const sy = params.size.y / halfH;\n            return pts.map(([px,py])=>[(px-cx)*sx, (py-cy)*sy]);\n        }\n\n        function getHandles(params) {\n            return {\n                n: [0, -params.size.y],\n                s: [0, params.size.y],\n                e: [params.size.x, 0],\n                w: [-params.size.x, 0],\n                ne: [params.size.x, -params.size.y],\n                se: [params.size.x, params.size.y],\n                nw: [-params.size.x, -params.size.y],\n                sw: [-params.size.x, params.size.y]\n            }\n        }\n\n        function getPath(params) {\n            const raw = parsePath(pathData);\n            const pts = centerAndScale(raw, params);\n            // Ensure closed shape\n            if(pts.length>0 && (pts[0][0]!==pts[pts.length-1][0] || pts[0][1]!==pts[pts.length-1][1])){\n                pts.push(pts[0]);\n            }\n            const out = pts.slice();\n            out.push({closed:true});\n            return out;\n        }\n    "
+  },
+  {
+    "id": "com.alightcreative.shapes.stamp",
+    "name": "Stamp",
+    "fileName": "stamp.xml",
+    "params": [
+      {
+        "id": "size",
+        "label": "@am:string/effect_param_size",
+        "default": "150,150",
+        "type": "size",
+        "paramType": "point"
+      },
+      {
+        "id": "cornerRadius",
+        "min": "0",
+        "max": "2000",
+        "default": "5",
+        "step": "1",
+        "label": "@am:string/effect_param_radius",
+        "paramType": "spinner"
+      },
+      {
+        "id": "perforationSize",
+        "min": "0",
+        "max": "500",
+        "default": "40",
+        "step": "1",
+        "label": "@am:string/effect_param_perfsize",
+        "paramType": "spinner"
+      },
+      {
+        "id": "perforationSpacing",
+        "min": "0",
+        "max": "500",
+        "default": "20",
+        "step": "1",
+        "label": "@am:string/effect_param_spacing",
+        "paramType": "spinner"
+      }
+    ],
+    "handles": [
+      {
+        "id": "r",
+        "param": "cornerRadius",
+        "type": "x",
+        "style": "square",
+        "icon": "grip"
+      },
+      {
+        "id": "e",
+        "param": "size",
+        "type": "x"
+      },
+      {
+        "id": "w",
+        "param": "size",
+        "type": "x",
+        "invert": "x"
+      },
+      {
+        "id": "n",
+        "param": "size",
+        "type": "y",
+        "invert": "y"
+      },
+      {
+        "id": "s",
+        "param": "size",
+        "type": "y"
+      },
+      {
+        "id": "se",
+        "param": "size",
+        "type": "xy",
+        "ratio": "true"
+      },
+      {
+        "id": "ne",
+        "param": "size",
+        "type": "xy",
+        "invert": "y",
+        "ratio": "true"
+      },
+      {
+        "id": "sw",
+        "param": "size",
+        "type": "xy",
+        "invert": "x",
+        "ratio": "true"
+      },
+      {
+        "id": "nw",
+        "param": "size",
+        "type": "xy",
+        "invert": "xy",
+        "ratio": "true"
+      }
+    ],
+    "script": "\n\n        function getHandles(params) {\n            let width = params.size.x;\n            let height = params.size.y;\n            let r = Math.min(Math.max(0.0,params.cornerRadius),Math.min(width,height));\n\n            return {\n                r: [-width + r, -height],\n                n: [0, -height],\n                s: [0, height],\n                e: [width, 0],\n                w: [-width, 0],\n                ne: [width, -height],\n                se: [width, height],\n                nw: [-width, -height],\n                sw: [-width, height]\n            }\n        }\n\n        function getPath(params) {\n            let width = params.size.x;\n            let height = params.size.y;\n            let r = Math.min(Math.max(0.0,params.cornerRadius),Math.min(width,height));\n            let cornerPointOffs = r * (1.0-0.552228474);\n            let perfSize = params.perforationSize;\n            let perfSpace = params.perforationSpacing;\n            let perfDist = perfSize + perfSpace;\n            let hspace = (width - r)*2;\n            let vspace = (height - r)*2;\n            let hcount = Math.floor((hspace-perfSpace) / perfDist);\n            let vcount = Math.floor((vspace-perfSpace) / perfDist);\n            let hspacing = (hspace - (hcount * perfSize)) / (hcount+1);\n            let vspacing = (vspace - (vcount * perfSize)) / (vcount+1);\n            let perfRad = perfSize / 2;\n            //let perfPointOffs = (perfSize/2) * (1.0-0.552228474);\n            let perfPointOffs = perfRad * 0.552228474;\n\n            //AM.log(\"[stamp] getPath : perfSize=\"+perfSize + \" perfDist=\"+perfDist + \" hspace=\"+hspace + \" hcount=\"+hcount + \" hspacing=\"+hspacing + \" perfPointOffs=\"+perfPointOffs);\n\n            let topEdge = [];\n            let bottomEdge = [];\n            let leftEdge = [];\n            let rightEdge = [];\n\n            let top = -height;\n            let bottom = height;\n            let left = -width;\n            let right = width;\n\n            let x = left + r + hspacing;\n            for( let i = 0; i < hcount; i++ ) {\n                topEdge.push({\n                    p: [x, top]\n                });\n                topEdge.push({\n                    p: [x + perfRad, top + perfRad],\n                    in: [x + perfRad - perfPointOffs, top + perfRad],\n                    out: [x + perfRad + perfPointOffs, top + perfRad]\n                });\n                x += perfSize;\n                topEdge.push({\n                    p: [x, top]\n                });\n                x += hspacing;\n            }\n\n            //AM.log(\"[stamp] getPath(2) : topEdge=\" + (topEdge.length) );\n\n            x = right - r - hspacing;\n            for( let i = 0; i < hcount; i++ ) {\n                bottomEdge.push({\n                    p: [x, bottom]\n                });\n                bottomEdge.push({\n                    p: [x - perfRad, bottom - perfRad],\n                    in: [x - perfRad + perfPointOffs, bottom - perfRad],\n                    out: [x - perfRad - perfPointOffs, bottom - perfRad]\n                });\n                x -= perfSize;\n                bottomEdge.push({\n                    p: [x, bottom]\n                });\n                x -= hspacing;\n            }\n\n            let y = top + r + vspacing;\n            for( let i = 0; i < vcount; i++ ) {\n                rightEdge.push({\n                    p: [right, y]\n                });\n                rightEdge.push({\n                    p: [right - perfRad, y + perfRad],\n                    in: [right - perfRad, y + perfRad - perfPointOffs],\n                    out: [right - perfRad, y + perfRad + perfPointOffs]\n                });\n                y += perfSize;\n                rightEdge.push({\n                    p: [right, y]\n                });\n                y += vspacing;\n            }\n\n            y = bottom - r - vspacing;\n            for( let i = 0; i < vcount; i++ ) {\n                leftEdge.push({\n                    p: [left, y]\n                });\n                leftEdge.push({\n                    p: [left + perfRad, y - perfRad],\n                    in: [left + perfRad, y - perfRad + perfPointOffs],\n                    out: [left + perfRad, y - perfRad - perfPointOffs]\n                });\n                y -= perfSize;\n                leftEdge.push({\n                    p: [left, y]\n                });\n                y -= vspacing;\n            }\n\n            let beginTopLeft = [{\n                    p: [-width + r, -height],\n                    in: [-width + cornerPointOffs, -height]\n                }];\n\n            let topRight = [{\n                    p: [width - r, -height],\n                    out: [width-cornerPointOffs, -height]\n                },\n                {\n                    p: [width, -height + r],\n                    in: [width, -height + cornerPointOffs]\n                }];\n\n            let bottomRight = [{\n                    p: [width, height-r],\n                    out: [width, height - cornerPointOffs]\n                },\n                {\n                    p: [width-r, height],\n                    in: [width-cornerPointOffs, height]\n                }];\n\n            let bottomLeft = [{\n                    p: [-width + r, height],\n                    out: [-width + cornerPointOffs, height]\n                },\n                {\n                    p: [-width, height-r],\n                    in: [-width, height-cornerPointOffs]\n                }];\n\n            let endTopLeftAndClose = [{\n                    p: [-width, -height + r],\n                    out: [-width, -height + cornerPointOffs]\n                },\n                {closed:true}]\n\n            return [].concat(\n                beginTopLeft,\n                topEdge,\n                topRight,\n                rightEdge,\n                bottomRight,\n                bottomEdge,\n                bottomLeft,\n                leftEdge,\n                endTopLeftAndClose\n            );\n        }\n\n    "
+  },
+  {
+    "id": "com.alightcreative.shapes.star",
+    "name": "Star",
+    "fileName": "star.xml",
+    "params": [
+      {
+        "id": "pointCount",
+        "default": "5",
+        "min": "3",
+        "max": "32",
+        "label": "@am:string/effect_param_num_points",
+        "step": "1",
+        "type": "integer",
+        "ticks": "3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32",
+        "paramType": "slider"
+      },
+      {
+        "id": "outerRadius",
+        "min": "0",
+        "max": "2000",
+        "default": "100",
+        "step": "1",
+        "label": "@am:string/effect_param_radius_out",
+        "paramType": "spinner"
+      },
+      {
+        "id": "innerRadius",
+        "min": "0",
+        "max": "2000",
+        "default": "50",
+        "step": "1",
+        "label": "@am:string/effect_param_radius_in",
+        "paramType": "spinner"
+      },
+      {
+        "id": "offsetAngle",
+        "min": "-3600",
+        "max": "3600",
+        "default": "0",
+        "step": "1",
+        "label": "@am:string/effect_param_angle",
+        "ticks": "45,90,135,180,225,270",
+        "type": "angle",
+        "paramType": "spinner"
+      }
+    ],
+    "handles": [
+      {
+        "id": "in",
+        "param": "innerRadius",
+        "type": "radius",
+        "icon": "grip"
+      },
+      {
+        "id": "out",
+        "param": "outerRadius",
+        "type": "radius",
+        "icon": "grip"
+      },
+      {
+        "id": "a",
+        "param": "offsetAngle",
+        "type": "angle",
+        "icon": "grip"
+      }
+    ],
+    "script": "\n\n        function getHandles(params) {\n            let innerRadius = params.innerRadius;\n            let outerRadius = params.outerRadius;\n            let pointCount = params.pointCount;\n            let radsPerPoint = 2.0*Math.PI/pointCount;\n            let radsPerHalfPoint = radsPerPoint / 2.0;\n            let offsetAngle = params.offsetAngle * Math.PI / 180.0;\n\n            let outerHandleAngle = Math.PI/2.0 + offsetAngle - radsPerPoint * Math.floor(pointCount/3);\n            let innerHandleAngle = radsPerPoint * Math.floor(pointCount*2/3) + Math.PI/2.0 + offsetAngle - radsPerHalfPoint;\n\n            return {\n                in: [innerRadius*Math.cos(innerHandleAngle),innerRadius*-Math.sin(innerHandleAngle)],\n                out: [outerRadius*Math.cos(outerHandleAngle),outerRadius*-Math.sin(outerHandleAngle)],\n                a: [outerRadius*Math.cos(offsetAngle + Math.PI/2.0),outerRadius*-Math.sin(offsetAngle + Math.PI/2.0)],\n            }\n        }\n\n        function getPath(params) {\n            let innerRadius = params.innerRadius;\n            let outerRadius = params.outerRadius;\n            let pointCount = params.pointCount;\n            let offsetAngle = params.offsetAngle * Math.PI / 180.0;\n            let points = [];\n            let radsPerPoint = 2.0*Math.PI/pointCount;\n            let radsPerHalfPoint = radsPerPoint / 2.0;\n            for( let i=0; i<pointCount; i++ ) {\n                let angle = radsPerPoint*i + Math.PI/2.0 + offsetAngle;\n                points.push([outerRadius*Math.cos(angle),outerRadius*-Math.sin(angle)]);\n                angle += radsPerHalfPoint;\n                points.push([innerRadius*Math.cos(angle),innerRadius*-Math.sin(angle)]);\n            }\n            points.push({closed:true});\n            return points;\n        }\n\n    "
+  },
+  {
+    "id": "com.alightcreative.shapes.teardrop",
+    "name": "Teardrop",
+    "fileName": "teardrop.xml",
+    "params": [
+      {
+        "id": "radius",
+        "label": "@am:string/effect_param_radius",
+        "min": "0",
+        "max": "2000",
+        "step": "1",
+        "default": "100",
+        "paramType": "spinner"
+      },
+      {
+        "id": "tail",
+        "label": "@am:string/effect_param_tail",
+        "min": "0",
+        "max": "5000",
+        "step": "1",
+        "default": "200",
+        "paramType": "spinner"
+      },
+      {
+        "id": "squeeze",
+        "label": "@am:string/effect_param_squeeze",
+        "min": "1",
+        "max": "10",
+        "step": "0.01",
+        "default": "2.5",
+        "paramType": "spinner"
+      },
+      {
+        "id": "tailWidth",
+        "label": "@am:string/effect_param_width",
+        "min": "0",
+        "max": "100",
+        "step": "0.1",
+        "default": "0",
+        "paramType": "spinner"
+      }
+    ],
+    "handles": [
+      {
+        "id": "radius",
+        "param": "radius",
+        "type": "x",
+        "icon": "grip"
+      },
+      {
+        "id": "tail",
+        "param": "tail",
+        "type": "y",
+        "invert": "y",
+        "icon": "grip"
+      }
+    ],
+    "script": "\n\n        function getHandles(params) {\n            return {\n                radius: [params.radius, 0],\n                tail: [0, -(params.radius*params.tail/100)]\n            }\n        }\n\n        function getPath(params) {\n            let width = params.radius;\n            let height = params.radius;\n            let tail = params.tail;\n            let tailWidth = params.tailWidth;\n            let squeeze = params.squeeze;\n            let cw = 0.551915024494 * width;\n            let ch = 0.551915024494 * height;\n            if( tailWidth > 0.001 ) {\n                return [\n                    {\n                        in:[-width/squeeze,-height*tail/(squeeze*100)],\n                        p:[-width*tailWidth/100,-height*tail/100]\n                    },\n                    {\n                        p:[width*tailWidth/100,-height*tail/100],\n                        out:[width/squeeze,-height*tail/(squeeze*100)]\n                    },\n                    {\n                        in:[width,-ch], // *tail/100\n                        p:[width,0],\n                        out:[width,ch]\n                    },\n                    {\n                        in:[cw,height],\n                        p:[0,height],\n                        out:[-cw,height]\n                    },\n                    {\n                        in:[-width,ch],\n                        p:[-width,0],\n                        out:[-width,-ch] // *tail/100\n                    },\n                    {closed:true}\n                ];\n            } else {\n                return [\n                    {\n                        in:[-width/squeeze,-height*tail/(squeeze*100)],\n                        p:[0,-height*tail/100],\n                        out:[width/squeeze,-height*tail/(squeeze*100)]\n                    },\n                    {\n                        in:[width,-ch], // *tail/100\n                        p:[width,0],\n                        out:[width,ch]\n                    },\n                    {\n                        in:[cw,height],\n                        p:[0,height],\n                        out:[-cw,height]\n                    },\n                    {\n                        in:[-width,ch],\n                        p:[-width,0],\n                        out:[-width,-ch] // *tail/100\n                    },\n                    {closed:true}\n                ];\n            }\n        }\n\n    "
+  },
+  {
+    "id": "com.alightcreative.shapes.triangle",
+    "name": "Triangle",
+    "fileName": "triangle.xml",
+    "params": [
+      {
+        "id": "p1",
+        "label": "@am:string/effect_param_point_1",
+        "default": "-100,100",
+        "paramType": "point"
+      },
+      {
+        "id": "p2",
+        "label": "@am:string/effect_param_point_2",
+        "default": "0,-100",
+        "paramType": "point"
+      },
+      {
+        "id": "p3",
+        "label": "@am:string/effect_param_point_3",
+        "default": "100,100",
+        "paramType": "point"
+      },
+      {
+        "id": "closed",
+        "default": "true",
+        "label": "@am:string/effect_param_closed",
+        "paramType": "switch"
+      }
+    ],
+    "handles": [
+      {
+        "id": "p1",
+        "param": "p1",
+        "type": "xy",
+        "icon": "hollow-dot"
+      },
+      {
+        "id": "p2",
+        "param": "p2",
+        "type": "xy",
+        "icon": "hollow-dot"
+      },
+      {
+        "id": "p3",
+        "param": "p3",
+        "type": "xy",
+        "icon": "hollow-dot"
+      }
+    ],
+    "script": "\n\n        function getHandles(params) {\n            return {\n                p1: params.p1,\n                p2: params.p2,\n                p3: params.p3\n            }\n        }\n\n        function getPath(params) {\n            return [\n                [params.p1.x,params.p1.y],\n                [params.p2.x,params.p2.y],\n                [params.p3.x,params.p3.y],\n                {closed:params.closed}\n            ];\n        }\n\n    "
+  },
+  {
+    "id": "com.alightcreative.shapes.wideline",
+    "name": "Wideline",
+    "fileName": "wideline.xml",
+    "params": [
+      {
+        "id": "start",
+        "label": "@am:string/effect_param_start",
+        "default": "0,0",
+        "paramType": "point"
+      },
+      {
+        "id": "end",
+        "label": "@am:string/effect_param_end",
+        "default": "250,-250",
+        "paramType": "point"
+      },
+      {
+        "id": "lineWidth",
+        "min": "0",
+        "max": "2000",
+        "default": "40",
+        "step": "1",
+        "label": "@am:string/effect_param_width",
+        "paramType": "spinner"
+      }
+    ],
+    "handles": [
+      {
+        "id": "s",
+        "param": "start",
+        "type": "xy",
+        "icon": "dot"
+      },
+      {
+        "id": "e",
+        "param": "end",
+        "type": "xy",
+        "icon": "hollow-dot"
+      },
+      {
+        "id": "lw",
+        "param": "lineWidth",
+        "type": "axis",
+        "style": "square",
+        "icon": "grip"
+      }
+    ],
+    "script": "\n\n        function getHandles(params) {\n            let lineWidth = params.lineWidth;\n            let end = params.end;\n            let start = params.start;\n            let dx = end.x-start.x;\n            let dy = end.y-start.y;\n            let dlen = Math.hypot(dx,dy);\n            let nx = dx / dlen;\n            let ny = dy / dlen;\n            let cwX = -dy / dlen;\n            let cwY = dx / dlen;\n            let ccwX = dy / dlen;\n            let ccwY = -dx / dlen;\n            return {\n                s: params.start,\n                e: params.end,\n                lw: {\n                    x: start.x + cwX * lineWidth + dx/3,\n                    y: start.y + cwY * lineWidth + dy/3,\n                    axis:[cwX,cwY]\n                }\n            }\n        }\n\n        function getPath(params) {\n            let lineWidth = params.lineWidth;\n            let end = params.end;\n            let start = params.start;\n            let dx = end.x-start.x;\n            let dy = end.y-start.y;\n            let dlen = Math.hypot(dx,dy);\n            let nx = dx / dlen;\n            let ny = dy / dlen;\n            let cwX = -dy / dlen;\n            let cwY = dx / dlen;\n            let ccwX = dy / dlen;\n            let ccwY = -dx / dlen;\n            return [\n                [start.x + cwX * lineWidth, start.y + cwY * lineWidth],\n                [start.x + ccwX * lineWidth, start.y + ccwY * lineWidth],\n                [end.x + ccwX * lineWidth, end.y + ccwY * lineWidth],\n                [end.x + cwX * lineWidth, end.y + cwY * lineWidth],\n                {closed:true}\n            ];\n        }\n\n    "
+  }
+]

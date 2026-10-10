@@ -1,0 +1,121 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect
+id="com.alightcreative.effects.mbl_colorista"
+name="Colorista"
+desc="Magic Bullet Colorista. Three-way color correction with Shadows/Midtones/Highlights color wheels, Temperature, Tint, Exposure, Contrast, Saturation, Hue, and Tone Curve."
+category="color"
+tags="colorista,color,grade,shadows,midtones,highlights,wheels,temperature,exposure,magic bullet,ae"
+thumb="thumb/colorista.webp"
+experimental="false">
+<params>
+<texture id="inputImg" srcType="content" />
+<section text="Color Correction" />
+<hue-disc id="shadowsWheel"    label="Shadows"    bias="true" default="0,0,0"  />
+<hue-disc id="midtonesWheel"   label="Midtones"   bias="true" default="0,0,0"  />
+<hue-disc id="highlightsWheel" label="Highlights" bias="true" default="0,0,0"  />
+<spinner id="temperature"  default="0.0"   min="-100.0" max="100.0" step="0.1"  label="Temperature"      />
+<spinner id="tint"         default="0.0"   min="-100.0" max="100.0" step="0.1"  label="Tint"             />
+<spinner id="exposure"     default="0.0"   min="-5.0"   max="5.0"   step="0.01" label="Exposure"         />
+<spinner id="contrast"     default="0.0"   min="-1.0"   max="1.0"   step="0.01" label="Contrast"         />
+<section text="Hue and Saturation" />
+<spinner id="saturation"   default="1.0"   min="0.0"    max="3.0"   step="0.01" label="Saturation"       />
+<spinner id="hueShift"     default="0.0"   min="-180.0" max="180.0" step="0.1"  label="Hue"              />
+<section text="Tone Curve" />
+<spinner id="curveShadow"  default="0.0"   min="-0.3"   max="0.3"   step="0.005" label="Curve Shadows"  />
+<spinner id="curveMid"     default="0.5"   min="0.2"    max="0.8"   step="0.005" label="Curve Midtones" />
+<spinner id="curveHigh"    default="1.0"   min="0.7"    max="1.3"   step="0.005" label="Curve Highlights"/>
+<spinner id="liftR"        default="0.0"   min="-0.2"   max="0.2"   step="0.005" label="Lift R"         />
+<spinner id="liftG"        default="0.0"   min="-0.2"   max="0.2"   step="0.005" label="Lift G"         />
+<spinner id="liftB"        default="0.0"   min="-0.2"   max="0.2"   step="0.005" label="Lift B"         />
+<section text="Global" />
+<spinner id="strength"     default="1.0"   min="0.0"    max="1.0"   step="0.01"  label="Strength"       />
+<slider  id="blend"        default="1.0"   min="0.0"    max="1.0"   label="Overall Blend" type="percent" />
+</params>
+<shader type="fragment" precision="high"><![CDATA[vec3 hsv2rgb(vec3 c) {
+vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
+vec3 p = abs(fract(c.xxx + K.xyz)*6.0 - K.www);
+return c.z * mix(K.xxx, clamp(p-K.xxx, 0.0, 1.0), c.y);
+}
+vec3 rgb2hsv(vec3 c) {
+vec4 K = vec4(0.0,-1.0/3.0,2.0/3.0,-1.0);
+vec4 p = mix(vec4(c.bg,K.wz), vec4(c.gb,K.xy), step(c.b,c.g));
+vec4 q = mix(vec4(p.xyw,c.r), vec4(c.r,p.yzx), step(p.x,c.r));
+float d = q.x - min(q.w,q.y);
+float e = 1.0e-10;
+return vec3(abs(q.z + (q.w-q.y)/(6.0*d+e)), d/(q.x+e), q.x);
+}
+float luma(vec3 c) { return dot(c, vec3(0.2126,0.7152,0.0722)); }
+vec3 toLinear(vec3 c) {
+return mix(c/12.92, pow(max((c+0.055)/1.055,vec3(0.0001)),vec3(2.4)),
+step(vec3(0.04045),c));
+}
+vec3 toSRGB(vec3 c) {
+c = max(c,vec3(0.0));
+return mix(c*12.92, 1.055*pow(c,vec3(1.0/2.4))-0.055,
+step(vec3(0.0031308),c));
+}
+vec3 wheelToOffset(vec3 wheel) {
+float hue = wheel.x / 360.0;
+float sat = wheel.y;
+float bias = wheel.z;
+if (sat < 0.001) return vec3(0.0);
+vec3 col = hsv2rgb(vec3(hue, sat, 1.0));
+return (col - 0.5) * sat * 0.15;
+}
+float applyCurve(float v) {
+float s = curveShadow + 0.0;
+float m = curveMid;
+float h = curveHigh;
+if (v < 0.5) {
+return mix(s, m, v * 2.0);
+} else {
+return mix(m, h, (v - 0.5) * 2.0);
+}
+}
+vec3 applyWhiteBalance(vec3 col, float temp, float tintV) {
+float t = temp / 100.0;
+float g = tintV / 100.0;
+col.r += t * 0.1;
+col.b -= t * 0.1;
+col.g += g * 0.05;
+col.r -= g * 0.025;
+col.b -= g * 0.025;
+return col;
+}
+void main() {
+vec2 uv  = acScreenNorm;
+vec4 src = texture2DCv(inputImg.texture, clamp(uv,0.0,1.0));
+vec3 col = src.rgb;
+vec3 raw = col;
+vec3 lin = toLinear(col);
+lin *= pow(2.0, exposure);
+if (abs(contrast) > 0.001) {
+float pivot = 0.18;
+lin = (lin - pivot) * (1.0 + contrast) + pivot;
+}
+col = toSRGB(max(lin, vec3(0.0)));
+float lum = luma(col);
+float shadowMask    = 1.0 - smoothstep(0.0, 0.5, lum);
+float highlightMask = smoothstep(0.5, 1.0, lum);
+float midtoneMask   = 1.0 - shadowMask - highlightMask;
+midtoneMask = max(midtoneMask, 0.0);
+vec3 shadowOffset    = wheelToOffset(vec3(shadowsWheel.x,    shadowsWheel.y,    shadowsWheel.z));
+vec3 midtoneOffset   = wheelToOffset(vec3(midtonesWheel.x,   midtonesWheel.y,   midtonesWheel.z));
+vec3 highlightOffset = wheelToOffset(vec3(highlightsWheel.x, highlightsWheel.y, highlightsWheel.z));
+col += shadowOffset    * shadowMask;
+col += midtoneOffset   * midtoneMask;
+col += highlightOffset * highlightMask;
+col = applyWhiteBalance(col, temperature, tint);
+float masterR = applyCurve(col.r) + liftR;
+float masterG = applyCurve(col.g) + liftG;
+float masterB = applyCurve(col.b) + liftB;
+col = vec3(masterR, masterG, masterB);
+vec3 hsv = rgb2hsv(clamp(col, 0.0, 1.0));
+hsv.x = fract(hsv.x + hueShift/360.0);
+hsv.y = clamp(hsv.y * saturation, 0.0, 1.0);
+col = hsv2rgb(hsv);
+col = clamp(col, 0.0, 1.0);
+col = mix(raw, col, strength);
+gl_FragColor = vec4(mix(raw, col, blend), src.a);
+}]]></shader>
+</effect>

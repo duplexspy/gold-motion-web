@@ -1,0 +1,32 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.lensdistort"
+name="Lens Distortion"
+desc="Simulates lens barrel/pincushion distortion"
+category="distort"
+tags="lens,distort,warp,barrel,pincushion,procedural"
+thumb="thumb/lensdist.webp"
+experimental="false">
+<params>
+<texture id="inputImg" srcType="content"/>
+<spinner id="strength" default="0.25" min="-10.0" max="1.0" step="0.01" label="Distortion Strength"/>
+<spinner id="blend" default="1.0" min="0.0" max="1.0" step="0.01" label="Blend With Image"/>
+</params>
+<passes>
+<pass/>
+</passes>
+<shader type="fragment" precision="high"><![CDATA[void main() {
+vec2 uv = acScreenNorm * 2.0 - 1.0;
+float r = length(uv);
+float k = strength;
+float distortedR = r + k * r * r;
+vec2 distortedUV = uv * (distortedR / max(r, 0.0001));
+distortedUV = (distortedUV + 1.0) * 0.5;
+vec4 color = vec4(0.0);
+if (distortedUV.x >= 0.0 && distortedUV.x <= 1.0 && distortedUV.y >= 0.0 && distortedUV.y <= 1.0) {
+color = texture2DCv(inputImg.texture, distortedUV);
+}
+vec4 orig = texture2DCv(inputImg.texture, acScreenNorm);
+vec4 finalColor = mix(orig, color, blend);
+gl_FragColor = finalColor;
+}]]></shader>
+</effect>

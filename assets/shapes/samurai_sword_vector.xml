@@ -1,0 +1,140 @@
+<shape id="com.alightcreative.shapes.samurai_sword_vector" name="Samurai Sword (SVG)">
+
+    <params>
+        <point id="size" label="@am:string/effect_param_size" default="100,20" type="size" />
+    </params>
+
+    <handle id="e" param="size" type="x" />
+    <handle id="w" param="size" type="x" invert="x" />
+    <handle id="n" param="size" type="y" invert="y" />
+    <handle id="s" param="size" type="y" />
+    <handle id="se" param="size" type="xy" lock-ratio="true" />
+    <handle id="ne" param="size" type="xy" invert="y" lock-ratio="true" />
+    <handle id="sw" param="size" type="xy" invert="x" lock-ratio="true" />
+    <handle id="nw" param="size" type="xy" invert="xy" lock-ratio="true" />
+
+    <script lang="js"><![CDATA[
+        // Minimal SVG path parser for M/m, L/l, H/h, V/v, Z/z.
+        // Converts pathData into a polygonal chain.
+        const pathData = "M80.832 10.368h35.328l-14.944 11.68h-57.728l-1.632 -2.24 -1.248 -1.056 -1.568 -0.704 -1.44 -0.256 -0.96 -0.128 -0.608 0.352 -2.336 0.448 -1.472 -0.768 -1.088 0.224 -0.576 8.928h-0.8l-3.008 -9.088 -1.92 -1.248h-16.032l-0.48 0.32 -0.48 0.416 -0.288 0.416h-2.88l-0.736 -0.864v-5.152l1.44 -0.736h2.432l0.992 1.28h15.84l3.52 -1.76h14.752l0.448 -0.672h4.672l1.568 1.76h29.568zM61.76 19.2v-1.248h-9.28v1.248h9.28zM65.056 19.2h33.376l-1.024 -1.248h-32.352v1.248zM99.84 17.472l4 -2.976v-0.672h-4.032v2.048l-0.704 0.64z";
+        const viewportWidth = 120;
+        const viewportHeight = 120;
+        const groupTranslateX = 0;
+        const groupTranslateY = 44;
+
+        function tokenize(d){
+            const tokens = [];
+            let i=0;
+            const isCmd = c => /[MmLlHhVvZz]/.test(c);
+            const isNum = c => /[0-9+\-.eE]/.test(c);
+            while(i<d.length){
+                const c=d[i];
+                if(isCmd(c)) { tokens.push({t:'cmd',v:c}); i++; continue; }
+                if(isNum(c)){
+                    let j=i+1;
+                    while(j<d.length && isNum(d[j])) j++;
+                    tokens.push({t:'num',v:parseFloat(d.slice(i,j))});
+                    i=j; continue;
+                }
+                i++;
+            }
+            return tokens;
+        }
+
+        function parsePath(d){
+            const tks = tokenize(d);
+            let i=0, cmd='M';
+            let x=0,y=0, sx=0, sy=0;
+            const points=[];
+            function addPoint(px,py){ points.push([px,py]); }
+            while(i<tks.length){
+                const tk=tks[i++];
+                if(!tk) break;
+                if(tk.t==='cmd'){ cmd=tk.v; if(cmd==='Z'||cmd==='z'){ addPoint(sx,sy); continue; } }
+                else { i--; }
+                switch(cmd){
+                    case 'M':{
+                        const nx=tks[i++].v; const ny=tks[i++].v;
+                        x=nx; y=ny; sx=x; sy=y; addPoint(x,y);
+                        cmd='L';
+                        break;
+                    }
+                    case 'm':{
+                        const dx=tks[i++].v; const dy=tks[i++].v;
+                        x+=dx; y+=dy; sx=x; sy=y; addPoint(x,y);
+                        cmd='l';
+                        break;
+                    }
+                    case 'L':{
+                        const nx=tks[i++].v; const ny=tks[i++].v;
+                        x=nx; y=ny; addPoint(x,y); break;
+                    }
+                    case 'l':{
+                        const dx=tks[i++].v; const dy=tks[i++].v;
+                        x+=dx; y+=dy; addPoint(x,y); break;
+                    }
+                    case 'H':{
+                        const nx=tks[i++].v; x=nx; addPoint(x,y); break;
+                    }
+                    case 'h':{
+                        const dx=tks[i++].v; x+=dx; addPoint(x,y); break;
+                    }
+                    case 'V':{
+                        const ny=tks[i++].v; y=ny; addPoint(x,y); break;
+                    }
+                    case 'v':{
+                        const dy=tks[i++].v; y+=dy; addPoint(x,y); break;
+                    }
+                    case 'Z': case 'z':{
+                        addPoint(sx,sy); break;
+                    }
+                    default: {
+                        // Unsupported commands ignored
+                        break;
+                    }
+                }
+            }
+            return points;
+        }
+
+        function centerAndScale(rawPts, params){
+            // apply group translate
+            const pts = rawPts.map(([px,py])=>[px+groupTranslateX, py+groupTranslateY]);
+            let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+            for(const [px,py] of pts){ if(px<minX)minX=px; if(px>maxX)maxX=px; if(py<minY)minY=py; if(py>maxY)maxY=py; }
+            const cx = (minX+maxX)/2;
+            const cy = (minY+maxY)/2;
+            const halfW = (maxX-minX)/2 || 1;
+            const halfH = (maxY-minY)/2 || 1;
+            const sx = params.size.x / halfW;
+            const sy = params.size.y / halfH;
+            return pts.map(([px,py])=>[(px-cx)*sx, (py-cy)*sy]);
+        }
+
+        function getHandles(params) {
+            return {
+                n: [0, -params.size.y],
+                s: [0, params.size.y],
+                e: [params.size.x, 0],
+                w: [-params.size.x, 0],
+                ne: [params.size.x, -params.size.y],
+                se: [params.size.x, params.size.y],
+                nw: [-params.size.x, -params.size.y],
+                sw: [-params.size.x, params.size.y]
+            }
+        }
+
+        function getPath(params) {
+            const raw = parsePath(pathData);
+            const pts = centerAndScale(raw, params);
+            // Ensure closed shape
+            if(pts.length>0 && (pts[0][0]!==pts[pts.length-1][0] || pts[0][1]!==pts[pts.length-1][1])){
+                pts.push(pts[0]);
+            }
+            const out = pts.slice();
+            out.push({closed:true});
+            return out;
+        }
+    ]]></script>
+
+</shape>

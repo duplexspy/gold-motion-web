@@ -1,0 +1,25 @@
+Gold Motion Extra offline AI models
+
+GM Anime
+- Architecture/weights: lightweight Real-ESRGAN Anime x4 (4B32F)
+- Runtime file: gm_anime_x4.tflite
+- Conversion source: https://huggingface.co/FuryTMP/RealESR_Animex4_fp16
+- The fixed 128px TFLite conversion preserves the trained network. Its nearest-neighbor
+  residual branch is expressed with mathematically equivalent built-in Concat and
+  DepthToSpace operations so Android does not require TensorFlow Flex ops.
+
+GM Soul
+- Architecture/weights: realesr-general-x4v3
+- Runtime file: gm_soul_x4.tflite
+- Conversion source: https://huggingface.co/JoPmt/Real_Esrgan_x2_Onnx_Tflite_Tfjs
+- Upstream project: https://github.com/xinntao/Real-ESRGAN
+- The same built-in-only residual resize substitution described above is used.
+
+Both runtime files are distinct models and are executed fully offline through
+the TensorFlow Lite runtime already bundled with Gold Motion.
+
+BG Cut
+- Architecture: U2-NetP / U2-Net Lite saliency segmentation
+- Runtime file: u2netp_lite.tflite (320x320 float32, seven side outputs)
+- Source artifact: https://huggingface.co/abhimanyu666/u2nettflite
+- License: Apache-2.0

@@ -1,0 +1,190 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.rgbcurves"
+name="RGB Curves Pro"
+desc="Professional RGB curves with 5-point master curve, per-channel R/G/B curves, luminance curve, saturation curve, and zone-based color control"
+category="color"
+tags="curves,rgb,red,green,blue,master,luminance,grade,cinematic"
+thumb="thumb/rgbcurves.webp">
+<params>
+<texture id="inputImg" srcType="content"/>
+<section text="MASTER CURVE"/>
+<spinner id="mcBlacks" label="Blacks" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<spinner id="mcDarkShadows" label="Dark Shadows" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<spinner id="mcShadows" label="Shadows" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<spinner id="mcMids" label="Midtones" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<spinner id="mcHighlights" label="Highlights" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<spinner id="mcBrightHighlights" label="Bright Highlights" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<spinner id="mcWhites" label="Whites" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<section text="RED CURVE"/>
+<spinner id="rcBlacks" label="Red Blacks" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<spinner id="rcShadows" label="Red Shadows" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<spinner id="rcMids" label="Red Midtones" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<spinner id="rcHighlights" label="Red Highlights" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<spinner id="rcWhites" label="Red Whites" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<section text="GREEN CURVE"/>
+<spinner id="gcBlacks" label="Green Blacks" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<spinner id="gcShadows" label="Green Shadows" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<spinner id="gcMids" label="Green Midtones" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<spinner id="gcHighlights" label="Green Highlights" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<spinner id="gcWhites" label="Green Whites" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<section text="BLUE CURVE"/>
+<spinner id="bcBlacks" label="Blue Blacks" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<spinner id="bcShadows" label="Blue Shadows" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<spinner id="bcMids" label="Blue Midtones" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<spinner id="bcHighlights" label="Blue Highlights" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<spinner id="bcWhites" label="Blue Whites" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<section text="LUMINANCE CURVE"/>
+<spinner id="lumBlacks" label="Lum Blacks" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<spinner id="lumShadows" label="Lum Shadows" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<spinner id="lumMids" label="Lum Midtones" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<spinner id="lumHighlights" label="Lum Highlights" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<spinner id="lumWhites" label="Lum Whites" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<section text="SATURATION CURVE"/>
+<spinner id="satBlacks" label="Sat in Blacks" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<spinner id="satShadows" label="Sat in Shadows" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<spinner id="satMids" label="Sat in Midtones" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<spinner id="satHighlights" label="Sat in Highlights" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<spinner id="satWhites" label="Sat in Whites" default="0.0" min="-100.0" max="100.0" step="0.5" type="float"/>
+<section text="ZONE COLOR"/>
+<color id="shadowTint" label="Shadow Tint" default="#808080" alpha="false"/>
+<spinner id="shadowTintStr" label="Shadow Tint Strength" default="0.0" min="0.0" max="1.0" step="0.01" type="float"/>
+<color id="midtoneTint" label="Midtone Tint" default="#808080" alpha="false"/>
+<spinner id="midtoneTintStr" label="Midtone Tint Strength" default="0.0" min="0.0" max="1.0" step="0.01" type="float"/>
+<color id="highlightTint" label="Highlight Tint" default="#808080" alpha="false"/>
+<spinner id="highlightTintStr" label="Highlight Tint Strength" default="0.0" min="0.0" max="1.0" step="0.01" type="float"/>
+<section text="OUTPUT"/>
+<spinner id="globalMix" label="Global Mix" default="1.0" min="0.0" max="1.0" step="0.01" type="percent"/>
+<section text="modded by saikuuxpp" />
+</params>
+<passes>
+<pass/>
+</passes>
+<shader type="fragment" precision="high"><![CDATA[#define EPS 0.00001
+float lum(vec3 c) {
+return dot(c, vec3(0.2126, 0.7152, 0.0722));
+}
+float curve7(float x, float b, float ds, float s, float m, float h, float bh, float w) {
+float result = x;
+float bN = b / 200.0;
+float dsN = ds / 200.0;
+float sN = s / 200.0;
+float mN = m / 200.0;
+float hN = h / 200.0;
+float bhN = bh / 200.0;
+float wN = w / 200.0;
+float wBlacks = smoothstep(0.08, 0.0, x);
+result += bN * wBlacks;
+float wDarkSh = smoothstep(0.0, 0.08, x) * smoothstep(0.22, 0.12, x);
+result += dsN * wDarkSh;
+float wShadows = smoothstep(0.05, 0.15, x) * smoothstep(0.38, 0.25, x);
+result += sN * wShadows;
+float wMids = smoothstep(0.18, 0.35, x) * smoothstep(0.82, 0.65, x);
+result += mN * wMids;
+float wHighs = smoothstep(0.58, 0.72, x) * smoothstep(0.95, 0.85, x);
+result += hN * wHighs;
+float wBrightH = smoothstep(0.78, 0.88, x) * smoothstep(1.0, 0.93, x);
+result += bhN * wBrightH;
+float wWhites = smoothstep(0.88, 1.0, x);
+result += wN * wWhites;
+return clamp(result, 0.0, 1.0);
+}
+float curve5(float x, float b, float s, float m, float h, float w) {
+float result = x;
+float bN = b / 200.0;
+float sN = s / 200.0;
+float mN = m / 200.0;
+float hN = h / 200.0;
+float wN = w / 200.0;
+float wBlacks = smoothstep(0.12, 0.0, x);
+result += bN * wBlacks;
+float wShadows = smoothstep(0.0, 0.12, x) * smoothstep(0.4, 0.22, x);
+result += sN * wShadows;
+float wMids = smoothstep(0.15, 0.35, x) * smoothstep(0.85, 0.65, x);
+result += mN * wMids;
+float wHighs = smoothstep(0.6, 0.78, x) * smoothstep(1.0, 0.88, x);
+result += hN * wHighs;
+float wWhites = smoothstep(0.88, 1.0, x);
+result += wN * wWhites;
+return clamp(result, 0.0, 1.0);
+}
+void main() {
+vec2 uv = acScreenNorm;
+vec4 original = texture2DCv(inputImg.texture, uv);
+vec3 rgb = max(original.rgb, 0.0);
+vec3 baseRGB = rgb;
+float masterL = lum(rgb);
+float curvedL = curve7(masterL,
+mcBlacks, mcDarkShadows, mcShadows, mcMids,
+mcHighlights, mcBrightHighlights, mcWhites);
+float masterRatio = curvedL / max(masterL, EPS);
+rgb *= masterRatio;
+rgb.r = curve5(rgb.r, rcBlacks, rcShadows, rcMids, rcHighlights, rcWhites);
+rgb.g = curve5(rgb.g, gcBlacks, gcShadows, gcMids, gcHighlights, gcWhites);
+rgb.b = curve5(rgb.b, bcBlacks, bcShadows, bcMids, bcHighlights, bcWhites);
+float curLum = lum(rgb);
+bool lumActive = (abs(lumBlacks) > 0.5 || abs(lumShadows) > 0.5 ||
+abs(lumMids) > 0.5 || abs(lumHighlights) > 0.5 ||
+abs(lumWhites) > 0.5);
+if (lumActive) {
+float newLum = curve5(curLum, lumBlacks, lumShadows, lumMids, lumHighlights, lumWhites);
+float lumRatio = newLum / max(curLum, EPS);
+rgb *= lumRatio;
+}
+bool satActive = (abs(satBlacks) > 0.5 || abs(satShadows) > 0.5 ||
+abs(satMids) > 0.5 || abs(satHighlights) > 0.5 ||
+abs(satWhites) > 0.5);
+if (satActive) {
+float l = lum(rgb);
+float zBlacks = smoothstep(0.12, 0.0, l);
+float zShadows = smoothstep(0.0, 0.12, l) * smoothstep(0.4, 0.22, l);
+float zMids = smoothstep(0.15, 0.35, l) * smoothstep(0.85, 0.65, l);
+float zHighs = smoothstep(0.6, 0.78, l) * smoothstep(1.0, 0.88, l);
+float zWhites = smoothstep(0.88, 1.0, l);
+float satMod = 1.0;
+satMod += (satBlacks / 100.0) * zBlacks;
+satMod += (satShadows / 100.0) * zShadows;
+satMod += (satMids / 100.0) * zMids;
+satMod += (satHighlights / 100.0) * zHighs;
+satMod += (satWhites / 100.0) * zWhites;
+satMod = max(satMod, 0.0);
+rgb = mix(vec3(l), rgb, satMod);
+}
+float zl = lum(rgb);
+if (shadowTintStr > EPS) {
+float shMask = 1.0 - smoothstep(0.0, 0.4, zl);
+shMask *= shMask;
+vec3 shTint = (shadowTint.rgb - 0.5) * 2.0;
+float origLum = lum(rgb);
+rgb += shTint * shadowTintStr * shMask * 0.2;
+float newLum = lum(rgb);
+if (newLum > EPS) {
+rgb *= mix(1.0, origLum / newLum, 0.7);
+}
+}
+if (midtoneTintStr > EPS) {
+float midMask = smoothstep(0.0, 0.3, zl) * smoothstep(1.0, 0.7, zl);
+vec3 midTint = (midtoneTint.rgb - 0.5) * 2.0;
+float origLum = lum(rgb);
+rgb += midTint * midtoneTintStr * midMask * 0.2;
+float newLum = lum(rgb);
+if (newLum > EPS) {
+rgb *= mix(1.0, origLum / newLum, 0.7);
+}
+}
+if (highlightTintStr > EPS) {
+float hlMask = smoothstep(0.6, 1.0, zl);
+hlMask *= hlMask;
+vec3 hlTint = (highlightTint.rgb - 0.5) * 2.0;
+float origLum = lum(rgb);
+rgb += hlTint * highlightTintStr * hlMask * 0.2;
+float newLum = lum(rgb);
+if (newLum > EPS) {
+rgb *= mix(1.0, origLum / newLum, 0.7);
+}
+}
+rgb = mix(baseRGB, rgb, globalMix);
+rgb = clamp(rgb, 0.0, 1.0);
+gl_FragColor = vec4(rgb, original.a);
+}]]></shader>
+<flag name="color"/>
+</effect>

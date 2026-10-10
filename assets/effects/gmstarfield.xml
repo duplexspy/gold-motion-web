@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect id="com.gmfx.effects.starfield" name="GM Star Field Warp" desc="Hyperspace star field flying past the camera with warp streaks and speed control" category="procedural" tags="stars,space,warp,hyperspace,galaxy" overdraw="false" thumb="thumb/gm/gmstarfield.webp">
+<params>
+<texture id="inputImg" srcType="content"/>
+<section text="STARS"/>
+<spinner id="starDensity" default="60.0" min="0.0" max="100.0" step="1.0" label="Star Density" type="percent"/>
+<spinner id="warpSpeed" default="0.5" min="0.0" max="4.0" step="0.05" label="Warp Speed"/>
+<spinner id="streakLen" default="1.4" min="1.0" max="8.0" step="0.1" label="Streak Length"/>
+<spinner id="starSize" default="1.0" min="0.2" max="4.0" step="0.05" label="Star Size"/>
+<section text="STYLE"/>
+<color id="starTint" default="#CFE0FF" label="Star Color" alpha="false"/>
+<switch id="skyReplace" default="false" label="Full Sky (no photo)"/>
+<spinner id="mixStars" default="1.0" min="0.0" max="2.0" step="0.05" label="Brightness"/>
+<spinner id="warpCX" default="50.0" min="0.0" max="100.0" step="0.5" label="Center X" type="percent"/>
+<spinner id="warpCY" default="50.0" min="0.0" max="100.0" step="0.5" label="Center Y" type="percent"/>
+</params>
+<shader type="fragment" precision="high"><![CDATA[float gmHash2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+float gmStarLayer(vec2 uv, vec2 c, float gridN, float speed, float streak, float sizePx, float seed, float t, float aspect, float gate){
+vec2 p = (uv - c) * vec2(1.0, aspect);
+float ang = atan(p.y, p.x);
+float rad = length(p) + 1e-4;
+float cellA = floor((ang / 6.2831853 + 0.5) * gridN);
+float h = gmHash2(vec2(cellA, seed));
+if (h < gate) return 0.0;
+float h2 = gmHash2(vec2(cellA * 1.9, seed * 2.3));
+float travel = fract(h2 + t * speed * (0.25 + h * 0.5));
+float starR = pow(travel, 2.2) * 1.4;
+float dR = rad - starR;
+float trail = exp(-max(dR, 0.0) * 60.0 / streak);
+float core = exp(-abs(dR) * 600.0 / max(sizePx, 0.2));
+float starA = (cellA + 0.15 + 0.7 * h) / gridN * 6.2831853 - 3.14159265;
+vec2 sp = vec2(cos(starA), sin(starA)) * starR;
+float dA = length(p - sp);
+float dotM = exp(-dA * dA * 9000.0 / max(sizePx * sizePx, 0.04));
+float bright = (0.3 + 0.7 * h2) * (0.25 + travel);
+return (dotM * 1.2 + trail * dotM * 0.6) * bright;
+}
+void main(){
+vec2 uv = acScreenNorm;
+vec4 src = texture2DCv(inputImg.texture, uv);
+float aspect = max(getTexSize(inputImg.size).x / max(getTexSize(inputImg.size).y, 1.0), 0.5);
+vec2 c = vec2(warpCX * 0.01, warpCY * 0.01);
+float gate = 1.0 - starDensity * 0.01;
+float t = acTime * warpSpeed;
+float s1 = gmStarLayer(uv, c, 90.0, 0.35, streakLen, starSize, 3.0, t, aspect, gate);
+float s2 = gmStarLayer(uv, c, 60.0, 0.5, streakLen * 1.4, starSize * 1.4, 17.0, t, aspect, gate);
+float s3 = gmStarLayer(uv, c, 36.0, 0.7, streakLen * 2.0, starSize * 2.0, 41.0, t, aspect, gate);
+float stars = (s1 * 0.7 + s2 * 1.0 + s3 * 1.4) * mixStars;
+if (skyReplace) {
+vec3 sky = vec3(0.008, 0.010, 0.030);
+gl_FragColor = vec4(sky + starTint.rgb * stars, src.a);
+} else {
+gl_FragColor = vec4(src.rgb * src.a + starTint.rgb * min(stars, 3.0) * src.a, src.a);
+}
+}]]></shader>
+</effect>

@@ -1,0 +1,155 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect
+id="com.alightcreative.effects.bcc_lensblur_obs+"
+name="BCC Lens Blur (AM)"
+desc="Lens blur / rackfocus style effect with polygonal iris, curvature, rotation and simple depth-of-field."
+category="blur"
+tags="blur, raster, bokeh, lens"
+thumb="thumb/SKEXNXX/bcc.webp"
+overdraw="true"
+max-overdraw="0.1"
+experimental="false">
+<params>
+<texture id="inputImg" srcType="content" />
+<tip text="—— Quality / Radius ——" />
+<slider id="ITERATIONS" label="Iterations (Quality)" default="32.0"
+min="4.0" max="64.0" step="1.0"
+type="integer"
+ticks="16,32,48,64"
+snap="16,32,48,64" />
+<spinner id="progressa" label="Strength" default="1.0"
+min="0.0" max="5.0" step="0.01" type="percent" />
+<spinner id="RADIUS" label="Base Radius" default="5.0"
+min="0.1" max="30.0" step="0.05" type="percent" />
+<spinner id="GAMMA" label="Highlight Gamma" default="2.5"
+min="0.5" max="6.0" step="0.05" type="percent" />
+<tip text="—— Iris / Bokeh Shape ——" />
+<selector id="IRIS_MODE" style="radio" default="0" label="Iris Shape">
+<choice label="Circle" value="0" />
+<choice label="Polygon" value="1" />
+</selector>
+<slider id="IRIS_SIDES" label="Sides (3–16)" default="6.0"
+min="3.0" max="16.0" step="1.0" type="integer" />
+<spinner id="IRIS_CURVATURE" label="Curvature" default="0.5"
+min="-1.0" max="1.0" step="0.01" type="percent" />
+<spinner id="IRIS_ROTATION" label="Rotation" default="0.0"
+min="0.0" max="360.0" step="1.0" type="angle" />
+<spinner id="SCALE_X" label="Iris Scale X" default="1.0"
+min="0.2" max="3.0" step="0.01" type="percent" />
+<spinner id="SCALE_Y" label="Iris Scale Y" default="1.0"
+min="0.2" max="3.0" step="0.01" type="percent" />
+<spinner id="BOKEH_SHADING" label="Bokeh Shading" default="0.3"
+min="0.0" max="1.0" step="0.01" type="percent" />
+<tip text="—— Focus (2D DOF Approximation) ——" />
+<spinner id="FOCUS_X" label="Focus X" default="0.5"
+min="0.0" max="1.0" step="0.01" type="percent" />
+<spinner id="FOCUS_Y" label="Focus Y" default="0.5"
+min="0.0" max="1.0" step="0.01" type="percent" />
+<spinner id="FOCUS_RADIUS" label="Focus Radius" default="0.0"
+min="0.0" max="1.0" step="0.01" type="percent" />
+<spinner id="FOCUS_SOFTNESS" label="Focus Softness" default="0.25"
+min="0.01" max="1.0" step="0.01" type="percent" />
+<tip text="—— Output / Blending ——" />
+<spinner id="bright" label="Brightness" default="1.0"
+min="0.0" max="3.0" step="0.01" type="percent" />
+<spinner id="alpha" label="Effect Mix" default="1.0"
+min="0.0" max="1.0" step="0.01" type="percent" />
+<selector id="blendMode" style="radio" default="0" label="@am:string/effect_param_blendmode">
+<choice label="NORMAL" value="0" />
+<choice label="MULTIPLY" value="1" />
+<choice label="SCREEN" value="2" />
+</selector>
+</params>
+<shader type="fragment" precision="medium"><![CDATA[#define PI 3.14159265359
+#define GOLDEN_ANGLE 2.3999632
+mat2 rot2m(float a) {
+float s = sin(a);
+float c = cos(a);
+return mat2(c, -s, s, c);
+}
+float irisMask(vec2 p, float sides, float curvature) {
+float r = length(p);
+if (r == 0.0) return 1.0;
+float angle = atan(p.y, p.x);
+float sector = 2.0 * PI / sides;
+float a = mod(angle, sector) - 0.5 * sector;
+float radiusEdge = cos(0.5 * sector) / cos(a);
+float t = clamp(curvature * 0.5 + 0.5, 0.0, 1.0);
+radiusEdge = mix(radiusEdge, 1.0, t);
+float m = smoothstep(radiusEdge, radiusEdge - 0.02, r);
+return m;
+}
+float focusFactor(vec2 uv) {
+if (FOCUS_RADIUS <= 0.0) return 1.0;
+vec2 focusPoint = vec2(FOCUS_X, FOCUS_Y);
+float d = distance(uv, focusPoint);
+float inner = FOCUS_RADIUS;
+float outer = FOCUS_RADIUS + FOCUS_SOFTNESS;
+outer = max(outer, inner + 0.001);
+return smoothstep(inner, outer, d);
+}
+vec3 LensBokeh(sampler2D tex, vec2 uv, float radiusNorm) {
+if (radiusNorm <= 0.0) {
+return texture2DCv(tex, uv).rgb;
+}
+float iter = max(1.0, float(ITERATIONS));
+vec2 vangle = vec2(0.0, radiusNorm / sqrt(iter));
+vec3 acc = vec3(0.0);
+vec3 div = vec3(0.0);
+float r = 1.0;
+float sides = max(3.0, IRIS_SIDES);
+bool usePolygon = (IRIS_MODE == 1);
+float irisRad = radians(IRIS_ROTATION);
+mat2 irisRotM = rot2m(irisRad);
+mat2 rot = rot2m(GOLDEN_ANGLE);
+for (float j = 0.0; j < float(ITERATIONS); j++) {
+r += 1.0 / r;
+vangle = rot * vangle;
+vec2 offset = (r - 1.0) * vangle;
+vec2 pNorm = offset / radiusNorm;
+pNorm *= vec2(SCALE_X, SCALE_Y);
+pNorm = irisRotM * pNorm;
+float mask = 1.0;
+if (usePolygon) {
+mask = irisMask(pNorm, sides, IRIS_CURVATURE);
+}
+if (mask <= 0.0) continue;
+float dist = clamp(length(pNorm), 0.0, 1.0);
+float shade = mix(1.0, 1.0 - dist, BOKEH_SHADING);
+vec3 col = texture2DCv(tex, uv + offset).rgb;
+vec3 w = pow(col, vec3(GAMMA));
+acc += col * w * mask * shade;
+div += w * mask * shade;
+}
+float divSum = div.x + div.y + div.z;
+if (divSum <= 0.0) {
+return texture2DCv(tex, uv).rgb;
+}
+return acc / div;
+}
+void main() {
+vec2 uv = acScreenNorm;
+vec4 texColor = texture2DCv(inputImg.texture, uv);
+float baseRadiusNorm = RADIUS * progressa * 0.01;
+float fFactor = focusFactor(uv);
+float radiusNorm = baseRadiusNorm * fFactor;
+vec3 blurRGB = LensBokeh(inputImg.texture, uv, radiusNorm);
+vec4 blurColor = vec4(blurRGB, texColor.a);
+vec4 factor = mix(texColor, blurColor, alpha);
+vec4 resultfinal;
+if (blendMode == 0) {
+resultfinal = factor * bright;
+resultfinal.a = texColor.a;
+} else if (blendMode == 1) {
+factor *= bright;
+vec4 c = factor + vec4(1.0) * (1.0 - factor.a);
+resultfinal = vec4((texColor.rgb / max(texColor.a, 1e-3)) * c.rgb, 1.0) * texColor.a;
+} else if (blendMode == 2) {
+factor *= bright;
+vec3 src = texColor.rgb / max(texColor.a, 1e-3);
+vec3 scr = 1.0 - ((1.0 - src) * (1.0 - factor.rgb));
+resultfinal = vec4(scr, 1.0) * texColor.a;
+}
+gl_FragColor = resultfinal;
+}]]></shader>
+</effect>

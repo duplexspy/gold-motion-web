@@ -1,0 +1,32 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.spot_exposure"
+name="Spot Exposure"
+desc="Adjusts exposure within a circular region"
+category="color"
+tags="color,exposure,spot,mask"
+thumb="thumb/spotexpo.webp">
+<params>
+<texture id="inputImg" srcType="content" />
+<spinner id="exposure" default="0.85" min="0.0" max="5.0" step="0.01" label="Base Exposure" />
+<spinner id="spotBoost" default="1.00" min="0.0" max="10.0" step="0.01" label="Spot Boost" />
+<spinner id="spotRadius" default="0.38" min="0.0" max="1.0" step="0.01" label="Spot Radius" />
+<spinner id="spotSoftness" default="0.50" min="0.001" max="1.0" step="0.01" label="Spot Softness" />
+<section text="Position" />
+<spinner id="centerX" default="0.5" min="0.0" max="1.0" step="0.001" label="Center X" />
+<spinner id="centerY" default="0.5" min="0.0" max="1.0" step="0.001" label="Center Y" />
+</params>
+<shader type="fragment" precision="high"><![CDATA[void main() {
+vec2 uv = acScreenNorm;
+float aspect = acScreenSize.x / acScreenSize.y;
+vec2 p = uv;
+p.x *= aspect;
+vec2 m = vec2(centerX, centerY);
+m.x *= aspect;
+float dist = length(p - m);
+float spotMask = smoothstep(spotRadius + spotSoftness, spotRadius, dist);
+vec4 texColor = texture2DCv(inputImg.texture, uv);
+float currentExposure = exposure + (spotBoost * spotMask);
+vec3 finalColor = texColor.rgb * currentExposure;
+gl_FragColor = vec4(finalColor, texColor.a);
+}]]></shader>
+</effect>

@@ -1,0 +1,149 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.polytrace_sampler"
+name="Polytrace Sampler"
+desc="Polygonal re-sampling of the layer. A jittered Voronoi lattice is built in LAYER space and every cell is filled with one colour taken from its own site, so the picture breaks into flat shards that move, scale and rotate with the layer instead of sitting on top of it."
+category="distort"
+tags="polytrace,voronoi,sampler,stylize,posterize,shards"
+thumb="thumb/polytrace.webp">
+<params>
+<texture id="inputImg" srcType="content" />
+<section text="Lattice" />
+<spinner id="cellPx" default="34.0" min="6.0" max="160.0" step="1.0" label="Cell Size (px)" />
+<slider id="jitter" default="0.42" min="0.0" max="1.0" label="Point Jitter" type="percent" />
+<spinner id="seed" default="0.0" min="-10.0" max="10.0" step="0.01" label="Seed" />
+<slider id="gradPull" default="0.55" min="0.0" max="2.0" label="Gradient Pull" type="percent" />
+<section text="Fill" />
+<selector id="fillMode" style="dropdown" default="0" label="Fill Mode">
+<choice value="0" label="Site Sample" />
+<choice value="1" label="Gradient Pulled" />
+<choice value="2" label="Cell Average" />
+</selector>
+<slider id="shade" default="0.35" min="0.0" max="1.0" label="Cell Shading" type="percent" />
+<slider id="saturate" default="1.15" min="0.0" max="2.5" label="Saturation" />
+<section text="Came" />
+<slider id="edgeW" default="0.22" min="0.0" max="1.0" label="Edge Width" type="percent" />
+<color id="edgeCol" default="#ff0a0a10" label="Edge Colour" alpha="true" />
+<slider id="edgeSoft" default="0.55" min="0.05" max="1.0" label="Edge Softness" type="percent" />
+<section text="Output" />
+<slider id="detail" default="0.45" min="0.0" max="1.0" label="Preserve Detail" type="percent" />
+<slider id="mixAmt" default="1.0" min="0.0" max="1.0" label="Effect Strength" type="percent" />
+<slider id="opacity" default="1.0" min="0.0" max="1.0" label="Output Opacity" type="percent" />
+</params>
+<shader type="fragment" precision="high"><![CDATA[float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+vec2  h22(vec2 p){ float n = h21(p); return vec2(n, h21(p + n + 7.7)); }
+float lumOf(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+float sat(float x){ return clamp(x, 0.0, 1.0); }
+
+// LAYER -> SCREEN. The lattice lives in layer space so it inherits the layer's
+// transform; every lookup back into the source has to come through here.
+vec2 lpToScreen(vec2 v){ return (vec4(v, 0.0, 1.0) * acLayerToScreen).xy; }
+vec4 fetchL(vec2 lp){
+vec2 halfPixel = 0.5 / max(acLayerSize, vec2(1.0));
+return texture2DCv(inputImg.texture, lpToScreen(clamp(lp, halfPixel, 1.0 - halfPixel)));
+}
+vec3 srcL(vec2 lp){ vec4 c = fetchL(lp); return c.rgb / max(c.a, 1e-4); }
+
+// Central-difference gradient of luminance, in layer units. Four taps, and only
+// paid for when the fill mode actually needs it - the old version ran this for
+// 25 candidate points per pixel, which is what made the effect unusable.
+vec2 gradL(vec2 lp, float e){
+vec2 d = vec2(e, 0.0);
+float gx = lumOf(srcL(lp + vec2(d.x, 0.0))) - lumOf(srcL(lp - vec2(d.x, 0.0)));
+float gy = lumOf(srcL(lp + vec2(0.0, d.x))) - lumOf(srcL(lp - vec2(0.0, d.x)));
+return vec2(gx, gy) / max(e * 2.0, 1e-4);
+}
+
+vec3 sat3(vec3 c, float s){ float l = lumOf(c); return mix(vec3(l), c, s); }
+
+void main(){
+vec4 src = texture2DCv(inputImg.texture, acScreenNorm);
+if (mixAmt <= 0.0 || src.a <= 0.0) { gl_FragColor = src * opacity; return; }
+vec2 lp  = acLayerNorm;
+
+// Aspect-corrected layer space: the cells stay square whatever the layer is.
+float asp = max(acLayerSize.x, 1.0) / max(acLayerSize.y, 1.0);
+vec2 lpA  = vec2(lp.x * asp, lp.y);
+
+// One cell is cellPx screen pixels tall measured on the layer, so the lattice
+// keeps its physical size when the layer is scaled.
+float tiles = max(acLayerSize.y / max(cellPx, 1.0), 1.0);
+vec2 g  = lpA * tiles;
+vec2 id = floor(g);
+vec2 f  = g - id;
+
+// F1 / F2 over the 3x3 neighbourhood. The jitter is held to the middle 72% of
+// the cell so the nearest site is always inside the neighbourhood - a full-cell
+// jitter lets a site two cells away win and the field then jumps.
+float d1 = 9.0; float d2 = 9.0;
+vec2  site = vec2(0.5);
+vec2  sid  = id;
+for (int j = -1; j <= 1; j++){
+for (int i = -1; i <= 1; i++){
+vec2 n = vec2(float(i), float(j));
+vec2 c = id + n;
+vec2 sp = n + 0.5 + (h22(c + seed * 3.7) - 0.5) * 0.72 * jitter;
+vec2 dv = sp - f;
+float d = dot(dv, dv);
+if (d < d1){ d2 = d1; d1 = d; site = sp; sid = c; }
+else if (d < d2){ d2 = d; }
+}
+}
+
+// Site back into layer space (undo the aspect correction on x only).
+vec2 siteA = (id + site) / tiles;
+vec2 siteLp = vec2(siteA.x / asp, siteA.y);
+
+// ---- fill ---------------------------------------------------------------
+vec3 cell;
+if (fillMode <= 0){
+cell = srcL(siteLp);
+} else if (fillMode <= 1){
+// Pull the sample point along the luminance gradient: shards crowd into the
+// detail and stretch flat across empty areas.
+float e = 1.5 / max(tiles, 1.0);
+vec2 gr = gradL(siteLp, e);
+float gl = length(gr);
+vec2 dir = (gl < 1e-5) ? vec2(0.0) : gr / gl;
+vec2 pull = dir * sat(gl) * gradPull * (0.75 / max(tiles, 1.0));
+cell = srcL(siteLp + pull);
+} else {
+// Five taps inside the cell: a flat average, so the shard reads as one piece
+// of the picture rather than a single pixel blown up.
+float r = 0.28 / max(tiles, 1.0);
+vec3 acc = srcL(siteLp);
+acc += srcL(siteLp + vec2( r, 0.0));
+acc += srcL(siteLp + vec2(-r, 0.0));
+acc += srcL(siteLp + vec2(0.0,  r));
+acc += srcL(siteLp + vec2(0.0, -r));
+cell = acc / 5.0;
+}
+
+// Per-shard shading from the site's own hash: breaks up large flat areas so two
+// adjacent cells of the same source colour are still readable as two cells.
+float hv = h21(sid * 2.17 + 9.1);
+cell *= 1.0 + (hv - 0.5) * shade * 0.55;
+cell = sat3(cell, saturate);
+
+// ---- came / edge ---------------------------------------------------------
+// F2 - F1 is zero exactly on the cell border and grows inside, so the came is
+// drawn with smoothstep() and never prints a hard aliased step.
+float border = max(sqrt(d2) - sqrt(d1), 0.0);
+float lw = edgeW * 0.30;
+float soft = 0.008 + edgeSoft * 0.055;
+float edge = edgeW <= 0.0 ? 0.0 : 1.0 - smoothstep(lw, lw + soft, border);
+
+vec3 base = src.rgb / max(src.a, 1e-4);
+vec3 c = mix(base, cell, 1.0);
+c = mix(c, edgeCol.rgb, sat(edge * 0.90 * edgeCol.a));
+
+// Preserve the source's own detail by letting the source luminance modulate the
+// flat fill - without this the result looks like paint-by-numbers.
+float srcLum = lumOf(base);
+c *= mix(1.0, 0.55 + 0.90 * srcLum, detail);
+
+c = clamp(c, 0.0, 1.0);
+c = mix(base, c, mixAmt);
+float alpha = src.a * opacity;
+gl_FragColor = vec4(c * alpha, alpha);
+}]]></shader>
+</effect>

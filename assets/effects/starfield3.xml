@@ -1,0 +1,67 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.starfield3" name="@am:string/effect_starfield_name" desc="@am:string/effect_starfield_desc" category="procedural" tags="procedural,random,raster" thumb="thumb/starfield.webp">
+<params>
+<texture id="inputImg" srcType="content" />
+<point id="offset" label="@am:string/effect_param_offset" />
+<spinner id="zoom" default="0.3" min="0.01" max="9.00" label="@am:string/effect_param_scale" step="0.01" />
+<slider id="moblur" default="0.0" min="0.0" max="1.0" label="Motion Blur" />
+<spinner id="brightness" default="0.0015" min="0.0001" max="0.300" label="@am:string/effect_param_brightness" step="0.0001" multiplier="10" />
+<spinner id="darkmatter" default="0.300" min="0.001" step="0.001" max="2.00" label="@am:string/effect_param_darkmatter" />
+</params>
+<shader type="fragment" precision="high"><![CDATA[#define iterations 14
+#define formuparam 0.53
+#define volsteps 16
+#define stepsize 0.1
+#define tile   0.850
+#define distfading 0.730
+#define saturation 0.450
+float hash(vec2 p) {
+return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+}
+void main() {
+vec4 texColor = texture2DCv(inputImg.texture,acScreenNorm);
+if( texColor.a <= 0.0001 )
+discard;
+vec2 fragCoord = gl_FragCoord.xy;
+vec2 iResolution = acScreenSize;
+float iTime = acTime;
+vec2 iMouse = vec2(.5,.5);
+vec2 uv = ((vec2(acScreenNorm.x,1.0-acScreenNorm.y)*acScreenSize)-acLayerCenter)/acLayerSize;
+uv.y*=acLayerSize.y/acLayerSize.x;
+vec3 dir=vec3(uv*zoom,1.);
+float a1=.5+iMouse.x/iResolution.x*2.;
+float a2=.8+iMouse.y/iResolution.y*2.;
+mat2 rot1=mat2(cos(a1),sin(a1),-sin(a1),cos(a1));
+mat2 rot2=mat2(cos(a2),sin(a2),-sin(a2),cos(a2));
+dir.xz*=rot1;
+dir.xy*=rot2;
+vec3 from=vec3(1.,.5,0.5);
+vec2 velocity = acVelocity * moblur / 1000.0;
+float jitter = hash(uv + iTime) - 0.5;
+vec2 blurOffset = -offset / 1000.0 + velocity * jitter;
+from+=vec3(blurOffset,-2.);
+from.xz*=rot1;
+from.xy*=rot2;
+float s=0.1,fade=1.;
+vec3 v=vec3(0.);
+for (int r=0; r<volsteps; r++) {
+vec3 p=from+s*dir*.5;
+p = abs(vec3(tile)-mod(p,vec3(tile*2.)));
+float pa,a=pa=0.;
+for (int i=0; i<iterations; i++) {
+p=abs(p)/dot(p,p)-formuparam;
+a+=abs(length(p)-pa);
+pa=length(p);
+}
+float dm=max(0.,darkmatter-a*a*.001);
+a*=a*a;
+if (r>6) fade*=1.-dm;
+v+=fade;
+v+=vec3(s,s*s,s*s*s*s)*a*brightness*fade;
+fade*=distfading;
+s+=stepsize;
+}
+v=mix(vec3(0.,v.g,length(v)),v,saturation);
+gl_FragColor = vec4(v*.01,1.);
+}]]></shader>
+</effect>

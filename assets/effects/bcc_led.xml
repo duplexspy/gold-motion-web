@@ -1,0 +1,78 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.bcc_led"
+name="BCC LED"
+desc="LED grid stylizer with shape, tint, flicker, and glow"
+category="stylize"
+thumb="thumb/bccled.webp"
+tags="led,grid,stylize">
+<params>
+<texture id="inputImg" srcType="content" />
+<section text="Grid" />
+<spinner id="ledSizeX" default="80.0" min="4.0" max="500.0" step="1.0" label="LED Size X (columns)" />
+<spinner id="ledSizeY" default="45.0" min="4.0" max="500.0" step="1.0" label="LED Size Y (rows)" />
+<spinner id="dotSize" default="0.43" min="0.05" max="0.8" step="0.001" label="Dot Size" />
+<spinner id="antialias" default="0.02" min="0.0" max="0.1" step="0.0005" label="Antialias" />
+<selector id="ledShape" style="dropdown" default="0" label="LED Shape">
+<choice label="Circle" value="0" />
+<choice label="Square" value="1" />
+</selector>
+<section text="Tint" />
+<color id="tintColor" default="#FFFFFFFF" label="Tint Color" alpha="false" />
+<spinner id="tintAmount" default="0.0" min="0.0" max="1.0" step="0.01" label="Tint Amount" />
+<section text="Flicker" />
+<spinner id="flickerSpeed" default="2.0" min="0.0" max="60.0" step="0.01" label="Flicker Speed (Hz)" />
+<spinner id="flickerAmount" default="0.2" min="0.0" max="1.0" step="0.01" label="Flicker Amount" />
+<section text="Glow" />
+<spinner id="glowAlpha" default="0.0" min="0.0" max="1.0" step="0.01" label="Glow Alpha" />
+<spinner id="glowSize" default="0.15" min="0.0" max="0.5" step="0.001" label="Glow Size" />
+<spinner id="glowBrightness" default="0.6" min="0.0" max="3.0" step="0.01" label="Glow Brightness" />
+<section text="Output" />
+<spinner id="brightness" default="1.0" min="0.0" max="3.0" step="0.01" label="Brightness" />
+</params>
+<shader type="fragment" precision="medium"><![CDATA[vec2 getResolution(){
+vec2 s = inputImg.size;
+if (s.x <= 0.0 || s.y <= 0.0) s = vec2(1920.0, 1080.0);
+return s;
+}
+float rand(vec2 co){ return fract(sin(dot(co.xy, vec2(12.9898,78.233))) * 43758.5453); }
+void main(){
+vec2 res = getResolution();
+vec2 fragCoord = acScreenNorm * res;
+vec2 uv = acScreenNorm;
+float cellW = res.x / max(ledSizeX, 1.0);
+float cellH = res.y / max(ledSizeY, 1.0);
+vec2 cellSize = vec2(cellW, cellH);
+vec2 cellIndex = floor(fragCoord / cellSize);
+vec2 cellCenterPos = (cellIndex + 0.5) * cellSize;
+vec2 cellUVn = (fragCoord - cellCenterPos) / cellSize;
+vec2 textureUV = cellCenterPos / res;
+vec4 baseSample = texture2DCv(inputImg.texture, textureUV);
+float srcAlpha = baseSample.a;
+vec3 baseCol = baseSample.rgb;
+baseCol = mix(baseCol, tintColor.rgb, tintAmount);
+float tBlock = floor(acTime * max(flickerSpeed, 0.0));
+float flickerRnd = rand(cellIndex + vec2(tBlock, tBlock*0.37));
+float flicker = mix(1.0 - flickerAmount, 1.0, flickerRnd);
+float dMask;
+if (int(ledShape) == 0){
+float dist = length(cellUVn);
+dMask = smoothstep(dotSize, dotSize - antialias, dist);
+} else {
+float m = max(abs(cellUVn.x), abs(cellUVn.y));
+dMask = smoothstep(dotSize, dotSize - antialias, m);
+}
+float glowMask;
+if (int(ledShape) == 0){
+float dist = length(cellUVn);
+glowMask = smoothstep(dotSize + glowSize, dotSize + glowSize - antialias, dist);
+} else {
+float m = max(abs(cellUVn.x), abs(cellUVn.y));
+glowMask = smoothstep(dotSize + glowSize, dotSize + glowSize - antialias, m);
+}
+vec3 col = baseCol * dMask * flicker;
+col += baseCol * glowBrightness * glowMask * glowAlpha;
+col *= brightness;
+float outA = max(dMask, glowAlpha * glowMask) * srcAlpha;
+gl_FragColor = vec4(col * srcAlpha, outA);
+}]]></shader>
+</effect>

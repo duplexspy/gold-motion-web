@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<effect id="com.goldmotion.effects.pnkj.tonalcompression" name="GM Tonal Compression" desc="Filmic toe and shoulder mapping with luminance-preserving saturation." category="other" tags="tone,color,filmic" thumb="thumb/pnkj_tonal_compression.webp" experimental="false">
+<params><texture id="inputImg" srcType="content" /><spinner id="exposure" default="0.0" min="-4.0" max="4.0" step="0.05" label="Exposure" /><spinner id="shoulder" default="0.8" min="0.1" max="3.0" step="0.05" label="Shoulder" /><spinner id="toe" default="0.12" min="0.0" max="0.8" step="0.01" label="Toe" /><spinner id="saturation" default="1.0" min="0.0" max="2.0" step="0.01" label="Saturation" /></params>
+<shader type="fragment" precision="high"><![CDATA[const vec3 L=vec3(0.2126,0.7152,0.0722);void main(){vec4 s=texture2DCv(inputImg.texture,acScreenNorm);vec3 x=max(s.rgb*pow(2.0,exposure),vec3(0.0));x=(x*(1.0+shoulder*x))/(1.0+x*(1.0+shoulder*x));x=mix(x,smoothstep(vec3(0.0),vec3(1.0),x),toe);float y=dot(x,L);x=mix(vec3(y),x,saturation);gl_FragColor=vec4(clamp(x,0.0,1.0),s.a);}]]></shader>
+</effect>

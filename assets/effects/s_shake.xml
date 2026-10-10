@@ -1,0 +1,126 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.shake_advanced"
+name="S_shake"
+desc="Advanced shake with per-axis random and wave components, wrap modes, seed, global angle, and optional motion blur"
+auto-transform="true"
+category="transform"
+tags="transform,auto,shake,propAdjust"
+thumb="thumb/s_shake.webp">
+<params>
+<section text="Global" />
+<spinner id="amplitude" default="0.240" min="-1000.0" max="1000.0" step="0.001" label="Amplitude" />
+<spinner id="frequency" default="7.40" min="-30.0" max="30.0" step="0.01" label="Frequency" />
+<spinner id="phase" default="1.64" min="-10.0" max="10.0" step="0.01" label="Phase" />
+<spinner id="globalAngle" default="0.0" min="-360.0" max="360.0" step="0.1" label="Global Angle" type="angle" />
+<spinner id="seed" default="0.0" min="0.0" max="10000.0" step="0.740" label="Seed" />
+<section text="Wrap" />
+<selector id="wrapX" default="3" style="dropdown" label="Wrap X">
+<choice label="None" value="0" />
+<choice label="Reflect" value="1" />
+<choice label="Clamp" value="2" />
+</selector>
+<selector id="wrapY" default="3" style="dropdown" label="Wrap Y">
+<choice label="None" value="0" />
+<choice label="Reflect" value="1" />
+<choice label="Clamp" value="2" />
+</selector>
+<section text="X Shake" />
+<spinner id="xRandAmp" default="56.8" min="-2000.0" max="2000.0" step="0.1" label="X Rand Amp" />
+<spinner id="xRandFreq" default="2.35" min="-30.0" max="30.0" step="0.01" label="X Rand Freq" />
+<spinner id="xWaveAmp" default="2.9" min="-2000.0" max="2000.0" step="0.1" label="X Wave Amp" />
+<spinner id="xWaveFreq" default="0.83" min="-30.0" max="30.0" step="0.01" label="X Wave Freq" />
+<spinner id="xPhase" default="0.0" min="-10.0" max="10.0" step="0.01" label="X Phase" />
+<section text="Y Shake" />
+<spinner id="yRandAmp" default="119.0" min="-2000.0" max="2000.0" step="0.1" label="Y Rand Amp" />
+<spinner id="yRandFreq" default="1.0" min="-30.0" max="30.0" step="0.01" label="Y Rand Freq" />
+<spinner id="yWaveAmp" default="0.0" min="-2000.0" max="2000.0" step="0.1" label="Y Wave Amp" />
+<spinner id="yWaveFreq" default="0.5" min="-30.0" max="30.0" step="0.01" label="Y Wave Freq" />
+<spinner id="yPhase" default="0.0" min="-10.0" max="10.0" step="0.01" label="Y Phase" />
+<section text="Z Shake (Zoom)" />
+<spinner id="zRandAmp" default="0.0" min="-10.0" max="10.0" step="0.001" label="Z Rand Amp" />
+<spinner id="zRandFreq" default="1.0" min="-30.0" max="30.0" step="0.01" label="Z Rand Freq" />
+<spinner id="zWaveAmp" default="0.0" min="-10.0" max="10.0" step="0.001" label="Z Wave Amp" />
+<spinner id="zWaveFreq" default="0.5" min="-30.0" max="30.0" step="0.01" label="Z Wave Freq" />
+<spinner id="zPhase" default="0.0" min="-10.0" max="10.0" step="0.01" label="Z Phase" />
+<section text="Tilt Shake (Rotation)" />
+<spinner id="tRandAmp" default="0.0" min="-360.0" max="360.0" step="0.01" label="Tilt Rand Amp" type="angle" />
+<spinner id="tRandFreq" default="1.0" min="-30.0" max="30.0" step="0.01" label="Tilt Rand Freq" />
+<spinner id="tWaveAmp" default="0.0" min="-360.0" max="360.0" step="0.01" label="Tilt Wave Amp" type="angle" />
+<spinner id="tWaveFreq" default="0.5" min="-30.0" max="30.0" step="0.01" label="Tilt Wave Freq" />
+<spinner id="tPhase" default="0.0" min="-10.0" max="10.0" step="0.01" label="Tilt Phase" />
+</params>
+<script lang="js"><![CDATA[function rand01(n){ return (Math.sin(n) * 43758.5453) % 1.0; }
+function hash1(x){ return rand01(x * 12.9898 + 78.233); }
+function smoothNoise(t){
+let i = Math.floor(t);
+let f = t - i;
+let a = hash1(i);
+let b = hash1(i + 1.0);
+let s = f*f*(3.0 - 2.0*f);
+return a*(1.0 - s) + b*s;
+}
+function wrapReflect(v, limit){
+if(limit <= 0) return v;
+let L = Math.abs(limit);
+let t = v + L;
+t = t - Math.floor(t / (2.0*L)) * (2.0*L);
+if(t > L) t = 2.0*L - t;
+return t - L;
+}
+function wrapClamp(v, limit){
+let L = Math.abs(limit);
+return Math.max(-L, Math.min(L, v));
+}
+function axisShake(env, baseFreq, basePhase, seed, randAmp, randFreq, waveAmp, waveFreq, phase){
+let t = env.time * env.duration;
+let fRand = randFreq <= 0 ? 0 : smoothNoise((t * randFreq * baseFreq) + seed*13.37) * 2.0 - 1.0;
+let fWave = waveAmp === 0 ? 0 : Math.sin((t * waveFreq * baseFreq + phase + basePhase) * Math.PI * 2.0);
+return fRand * randAmp + fWave * waveAmp;
+}
+function computeOffsets(env,p){
+let baseFreq = p.frequency;
+let basePhase = p.phase;
+let seed = p.seed;
+let dx = axisShake(env, baseFreq, basePhase, seed+1.0, p.xRandAmp, p.xRandFreq, p.xWaveAmp, p.xWaveFreq, p.xPhase);
+let dy = axisShake(env, baseFreq, basePhase, seed+2.0, p.yRandAmp, p.yRandFreq, p.yWaveAmp, p.yWaveFreq, p.yPhase);
+let dz = axisShake(env, baseFreq, basePhase, seed+3.0, p.zRandAmp, p.zRandFreq, p.zWaveAmp, p.zWaveFreq, p.zPhase);
+let dTilt = axisShake(env, baseFreq, basePhase, seed+4.0, p.tRandAmp, p.tRandFreq, p.tWaveAmp, p.tWaveFreq, p.tPhase);
+dx *= p.amplitude; dy *= p.amplitude;
+let a = p.globalAngle * Math.PI / 180.0;
+let cosA = Math.cos(a), sinA = Math.sin(a);
+let rx = dx * cosA - dy * sinA;
+let ry = dx * sinA + dy * cosA;
+dx = rx; dy = ry;
+if(p.wrapX == 1){ dx = wrapReflect(dx, p.xRandAmp + p.xWaveAmp); } else if(p.wrapX == 2){ dx = wrapClamp(dx, p.xRandAmp + p.xWaveAmp); }
+if(p.wrapY == 1){ dy = wrapReflect(dy, p.yRandAmp + p.yWaveAmp); } else if(p.wrapY == 2){ dy = wrapClamp(dy, p.yRandAmp + p.yWaveAmp); }
+return {dx:dx, dy:dy, dz:dz, dTilt:dTilt};
+}
+function applyOffsets(el, off){
+el.transform.location.x += off.dx;
+el.transform.location.y += off.dy;
+if(el.transform.scale){
+el.transform.scale.x *= (1.0 + off.dz);
+el.transform.scale.y *= (1.0 + off.dz);
+}
+el.transform.angle += off.dTilt;
+return el;
+}
+function animate(env, el, p){
+if(!p.motionBlur){
+let off = computeOffsets(env,p);
+return applyOffsets(el, off);
+} else {
+let n = Math.max(1, Math.floor(p.mbLength));
+let acc = {dx:0,dy:0,dz:0,dTilt:0};
+for(let i=0;i<n;i++){
+let tPrev = env.time;
+env.time = tPrev - (i/(n));
+let off = computeOffsets(env,p);
+acc.dx += off.dx; acc.dy += off.dy; acc.dz += off.dz; acc.dTilt += off.dTilt;
+env.time = tPrev;
+}
+acc.dx /= n; acc.dy /= n; acc.dz /= n; acc.dTilt /= n;
+return applyOffsets(el, acc);
+}
+}]]></script>
+</effect>

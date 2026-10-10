@@ -1,0 +1,29 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.oscillate" name="@am:string/effect_oscillate_name" desc="@am:string/effect_oscillate_desc" auto-transform="true" category="transform" tags="transform,auto,essentials,shake,propAdjust" thumb="thumb/oscillate.webp" deprecated="true">
+<params>
+<spinner id="angle" default="45" min="0.0" max="180.0" label="@am:string/effect_param_angle" type="angle" />
+<spinner id="freq" default="2.0" min="0.1" max="16.0" label="@am:string/effect_param_freq" />
+<slider id="mag" default="25" min="1" max="500" label="@am:string/effect_param_mag" />
+<selector id="type" default="0" style="radio" label="@am:string/effect_param_wave" >
+<choice label="@am:string/effect_param_sine" value="0" />
+<choice label="@am:string/effect_param_triangle" value="1" />
+</selector>
+</params>
+<script lang="js"><![CDATA[function animate(env,el,p) {
+let t = env.time;
+var a = p.angle * (Math.PI / 180);
+var dx = Math.sin(a);
+var dy = Math.cos(a);
+let m
+if( p.type == 0 ) {
+m = Math.sin(t * env.duration * p.freq * 3.14159)
+} else {
+m = AM.triangle(t * env.duration * p.freq / 2.0)
+}
+dx *= p.mag * m;
+dy *= p.mag * m;
+el.transform.location.x += dx;
+el.transform.location.y += dy;
+return el;
+}]]></script>
+</effect>

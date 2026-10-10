@@ -1,0 +1,55 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.eye_split_bend"
+name="Split"
+desc="Eye-shaped split with bend; animating open/close. Inside area is black; outside shows layer."
+category="matte"
+tags="split,mask,transition,shadertoy,procedural"
+thumb="thumb/split.webp">
+<params>
+<texture id="inputImg" srcType="content" />
+<section text="Placement" />
+<point id="pointA" default="200,540" label="Point A" />
+<point id="pointB" default="1720,540" label="Point B" />
+<section text="Split" />
+<spinner id="split" default="54.0" min="0.0" max="1000.0" step="0.5" label="Split" />
+<section text="Advanced" />
+<spinner id="sharpness" default="8.8" min="0.5" max="32.0" step="0.1" label="Sharpness" />
+<spinner id="bendFactor" default="0.10" min="-1.0" max="1.0" step="0.01" label="Bend" />
+<spinner id="tipSharpness" default="2.5" min="0.5" max="10.0" step="0.05" label="Tip Sharpness" />
+<spinner id="lobePower" default="1.2" min="0.5" max="4.0" step="0.05" label="Lobe Power" />
+<spinner id="upperScale" default="1.15" min="0.5" max="2.0" step="0.01" label="Upper Scale" />
+<spinner id="lowerScale" default="0.85" min="0.5" max="2.0" step="0.01" label="Lower Scale" />
+<switch id="invertInside" default="false" label="Invert Inside/Outside" />
+<section text="Output" />
+<spinner id="alpha" default="1.0" min="0.0" max="1.0" step="0.01" label="Alpha" type="percent" />
+</params>
+<shader type="fragment" precision="high"><![CDATA[vec2 perp(vec2 v){ return vec2(-v.y, v.x); }
+void main(){
+vec2 uv = acScreenNorm;
+vec4 src = texture2DCv(inputImg.texture, uv);
+vec2 Auv = pointA / acScreenSize;
+vec2 Buv = pointB / acScreenSize;
+vec2 Muv = (Auv + Buv) * 0.5;
+vec2 dir = normalize(Buv - Auv);
+vec2 nrm = perp(dir);
+float halfLen = max(length(Buv - Auv) * 0.5, 1e-6);
+vec2 p = uv - Muv;
+float x = dot(p, dir);
+float y = dot(p, nrm);
+float xN = x / halfLen;
+float splitUV = (split / max(acScreenSize.y, 1.0));
+float xAbs = abs(xN);
+float base = pow(max(0.0, 1.0 - pow(xAbs, tipSharpness)), sharpness);
+base = pow(base, lobePower);
+float topBoundary    = splitUV * upperScale * base;
+float bottomBoundary = splitUV * lowerScale * base;
+float vertical_bend = bendFactor * (0.25 - (xN * xN));
+float yRel = y - vertical_bend;
+bool inside = (yRel <= topBoundary) && (yRel >= -bottomBoundary);
+vec4 transparent = vec4(0.0,0.0,0.0,0.0);
+vec4 outCol = (invertInside ? (inside ? src : transparent)
+: (inside ? transparent : src));
+float aSrc = src.a * alpha;
+gl_FragColor = outCol * aSrc;
+}]]></shader>
+</effect>

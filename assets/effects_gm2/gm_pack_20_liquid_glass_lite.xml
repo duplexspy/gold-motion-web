@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<effect id="com.goldmotion.effects.v53.shaderpack.liquid_glass_lite" name="GM Liquid Glass Lite" desc="Rounded-rectangle liquid glass with efficient refraction, Gaussian blur and coloured inner glow." category="distort" tags="gm,shader,procedural,distort" thumb="thumb/Liquid-Glass-Lite.webp" overdraw="true" max-overdraw="0.3" experimental="false" deprecated="false">
+<params>
+<texture id="inputImg" srcType="content" />
+<section text="Glass Panel" />
+<spinner id="liteCenterX" default="0.5" min="0" max="1" step="0.005" label="Panel X" />
+<spinner id="liteCenterY" default="0.5" min="0" max="1" step="0.005" label="Panel Y" />
+<spinner id="liteWidth" default="0.3" min="0.05" max="1" step="0.01" label="Panel Width" />
+<spinner id="liteHeight" default="0.3" min="0.05" max="1" step="0.01" label="Panel Height" />
+<spinner id="liteRadius" default="30" min="0" max="300" step="1" label="Corner Radius" />
+<spinner id="liteThickness" default="0.5" min="0" max="2" step="0.01" label="Edge Bend" />
+<spinner id="liteIor" default="25" min="1.01" max="40" step="0.1" label="Refraction IOR" />
+<spinner id="liteRefraction" default="0.25" min="0" max="1" step="0.01" label="Refraction Distance" />
+<selector id="liteSamples" style="dropdown" default="16" label="Blur Quality"><choice label="Fast" value="9" /><choice label="Balanced" value="16" /><choice label="Smooth" value="36" /></selector>
+<spinner id="liteBlurMix" default="1" min="0" max="1" step="0.01" label="Blur Mix" />
+<spinner id="liteGlowWidth" default="2.75" min="0.1" max="20" step="0.05" label="Glow Width" />
+<spinner id="liteGlowIntensity" default="0.9" min="0" max="4" step="0.01" label="Glow Intensity" />
+<section text="Composite" />
+<spinner id="gmMix" default="1" min="0" max="1" step="0.01" type="percent" label="Mix" />
+<switch id="gmClip" default="true" label="Clip to Layer" />
+<section text="MOD BY PNKJ" />
+</params>
+<shader type="fragment" precision="high"><![CDATA[#define iTime (0.0)
+#define iResolution vec3(acLayerSize, 1.0)
+#define iDate vec4(0.0, 0.0, 0.0, iTime)
+#define iMouse vec4(acLayerSize * 0.5, 0.0, 0.0)
+vec3 glassNormal(vec2 uv, vec2 rectCenter, float width, float height, float radius, float thickness) {
+vec2 fromCenter = uv - rectCenter;
+vec2 halfSize = vec2(width, height) * 0.5;
+vec2 normalizedPos = fromCenter / halfSize;
+vec2 d = abs(normalizedPos);
+float maxDist = max(d.x, d.y);
+float edgeFactor = smoothstep(0.0, 1.0, maxDist);
+vec3 normal = vec3(0.0, 0.0, 1.0);
+float bendStrength = thickness * pow(edgeFactor, 15.0);
+float maxRefraction = 0.56;
+vec2 bentDirection = normalize(normalizedPos) * min(length(normalizedPos), maxRefraction);
+normal.xy = bentDirection * bendStrength;
+if (d.x > 0.7 && d.y > 0.7) {
+float cornerFactor = (d.x - 0.7) * (d.y - 0.7) * 25.0;
+normal.xy *= (1.0 + cornerFactor);
+}
+return normalize(normal);
+}
+vec2 refractRay(vec2 uv, vec3 normal, vec2 resolution) {
+vec2 normalizedUV = uv / resolution;
+float ior = liteIor;
+vec3 viewRay = vec3(0.0, 0.0, 1.0);
+vec3 refracted = refract(viewRay, normal, 1.0/ior);
+float thickness = liteRefraction;
+vec2 offset = -refracted.xy * thickness;
+return normalizedUV + offset;
+}
+float roundedRectMask(vec2 uv, vec2 pos, float width, float height, float radius) {
+vec2 halfSize = vec2(width, height) * 0.5;
+vec2 d = abs(uv - pos) - halfSize + radius;
+float distToRect = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - radius;
+return step(distToRect, 0.0);
+}
+float gaussian(vec2 i, float sigma) {
+return exp( -.5* dot(i/=sigma,i) ) / ( 6.28 * sigma*sigma );
+}
+vec3 gaussianBlur(sampler2D sp, vec2 U, vec2 scale, int samples, int LOD) {
+vec3 O = vec3(0);
+float totalWeight = 0.0;
+int sLOD = 1;
+float sigma = float(samples) * .25;
+int s = samples <= 9 ? 3 : (samples <= 16 ? 4 : 6);
+for ( int i = 0; i < 36; i++ ) { if(i >= s*s) break;
+float fi=float(i); float fs=max(float(s),1.0); vec2 d=(vec2(mod(fi,fs),floor(fi/fs))-(fs-1.0)*0.5)*float(sLOD);
+float weight = gaussian(d, sigma);
+O += weight * texture2DCv( sp, U + scale * d ).rgb;
+totalWeight += weight;
+}
+return O / totalWeight;
+}
+vec4 renderGlassLayer(vec2 uv, vec2 rectPos, float width, float height, float radius,
+sampler2D originalTex, sampler2D kawaseTex, vec2 resolution,
+bool visualizeNormals, int gaussianSamples, float blurMix) {
+float mask = roundedRectMask(uv, rectPos, width, height, radius);
+if (mask < 0.01) {
+return vec4(0.0);
+}
+float glassThickness = liteThickness;
+vec3 normal = glassNormal(uv, rectPos, width, height, radius, glassThickness);
+if (visualizeNormals) {
+float r = normal.x * 0.5 + 0.5;
+float g = normal.y * 0.5 + 0.5;
+float b = normal.z;
+return vec4(r, g, b, mask);
+} else {
+vec2 refractedUV = refractRay(uv, normal, resolution);
+refractedUV = clamp(refractedUV, 0.0, 1.0);
+vec3 originalSample = texture2DCv(originalTex, refractedUV).rgb;
+vec3 finalSample = originalSample;
+if (blurMix > 0.001) {
+vec3 kawaseResult = texture2DCv(kawaseTex, refractedUV).rgb;
+vec2 scale = 1.0 / resolution;
+vec3 blurredSample = gaussianBlur(kawaseTex, refractedUV, scale, gaussianSamples, 1);
+finalSample = mix(originalSample, blurredSample, blurMix);
+}
+return vec4(finalSample, mask);
+}
+}
+vec3 rgb2hsl(vec3 color) {
+float maxColor = max(max(color.r, color.g), color.b);
+float minColor = min(min(color.r, color.g), color.b);
+float delta = maxColor - minColor;
+vec3 hsl = vec3(0.0, 0.0, (maxColor + minColor) / 2.0);
+if (delta > 0.0) {
+hsl.y = (hsl.z < 0.5) ? (delta / (maxColor + minColor)) : (delta / (2.0 - maxColor - minColor));
+if (maxColor == color.r) {
+hsl.x = (color.g - color.b) / delta + (color.g < color.b ? 6.0 : 0.0);
+} else if (maxColor == color.g) {
+hsl.x = (color.b - color.r) / delta + 2.0;
+} else {
+hsl.x = (color.r - color.g) / delta + 4.0;
+}
+hsl.x /= 6.0;
+}
+return hsl;
+}
+float hue2rgb(float p, float q, float t) {
+if (t < 0.0) t += 1.0;
+if (t > 1.0) t -= 1.0;
+if (t < 1.0/6.0) return p + (q - p) * 6.0 * t;
+if (t < 1.0/2.0) return q;
+if (t < 2.0/3.0) return p + (q - p) * (2.0/3.0 - t) * 6.0;
+return p;
+}
+vec3 hsl2rgb(vec3 hsl) {
+if (hsl.y == 0.0) {
+return vec3(hsl.z);
+}
+float q = hsl.z < 0.5 ? hsl.z * (1.0 + hsl.y) : hsl.z + hsl.y - hsl.z * hsl.y;
+float p = 2.0 * hsl.z - q;
+vec3 rgb;
+rgb.r = hue2rgb(p, q, hsl.x + 1.0/3.0);
+rgb.g = hue2rgb(p, q, hsl.x);
+rgb.b = hue2rgb(p, q, hsl.x - 1.0/3.0);
+return rgb;
+}
+vec3 createInnerGlowEffect(vec2 uv, vec2 rectPos, float width, float height, float radius,
+sampler2D blurredTex, vec2 resolution, float glowWidth, float glowIntensity) {
+float glassMask = roundedRectMask(uv, rectPos, width, height, radius);
+if (glassMask < 0.01) {
+return vec3(0.0);
+}
+vec2 halfSize = vec2(width, height) * 0.5;
+vec2 d = abs(uv - rectPos) - halfSize + vec2(radius);
+float straightEdgeDist = min(max(d.x, d.y), 0.0);
+float cornerDist = length(max(d, 0.0)) - radius;
+float signedDist = straightEdgeDist + cornerDist;
+float distFromEdge = -signedDist;
+float falloff = smoothstep(0.0, glowWidth, distFromEdge);
+if (distFromEdge < 0.0 || falloff >= 0.98) {
+return vec3(0.0);
+}
+vec2 normalizedUV = uv / resolution;
+vec3 blurredColor = texture2DCv(blurredTex, normalizedUV).rgb;
+vec3 hsl = rgb2hsl(blurredColor);
+hsl.y = min(hsl.y * 1.4, 1.0);
+hsl.z = min(hsl.z * 2.5, 1.0);
+vec3 glowColor = hsl2rgb(hsl);
+glowColor *= glowIntensity;
+return glowColor * glassMask * (1.0 - falloff);
+}
+vec4 renderGlassLayerWithGlow(vec2 uv, vec2 rectPos, float width, float height, float radius,
+sampler2D originalTex, sampler2D kawaseTex, vec2 resolution,
+bool visualizeNormals, int gaussianSamples, float blurMix,
+float glowWidth, float glowIntensity) {
+vec4 glassLayer = renderGlassLayer(
+uv, rectPos, width, height, radius,
+originalTex, kawaseTex, resolution, visualizeNormals,
+gaussianSamples, blurMix
+);
+vec3 innerGlow = createInnerGlowEffect(
+uv, rectPos, width, height, radius,
+kawaseTex, resolution, glowWidth, glowIntensity
+);
+glassLayer.rgb += innerGlow;
+return glassLayer;
+}
+void gmGeneratedMainImage(out vec4 fragColor, in vec2 fragCoord) {
+vec2 uv = fragCoord.xy;
+vec3 backgroundValue = texture2DCv(inputImg.texture, fragCoord/iResolution.xy).rgb;
+vec4 background = vec4(backgroundValue, 1.0);
+vec2 rectPos = vec2(liteCenterX,liteCenterY)*iResolution.xy;
+float width = liteWidth * iResolution.x;
+float height = liteHeight * iResolution.x;
+float radius = liteRadius;
+bool visualizeNormals = false;
+int gaussianSamples = liteSamples;
+float blurMix = liteBlurMix;
+float glowWidth = liteGlowWidth;
+float glowIntensity = liteGlowIntensity;
+vec4 glassWithGlow = renderGlassLayerWithGlow(
+uv, rectPos, width, height, radius,
+inputImg.texture, inputImg.texture, iResolution.xy, visualizeNormals,
+gaussianSamples, blurMix,
+glowWidth, glowIntensity
+);
+vec4 result = mix(background, glassWithGlow, glassWithGlow.a);
+fragColor = result;
+}
+void main(){
+vec4 gmGenerated=vec4(0.0);
+gmGeneratedMainImage(gmGenerated,acLayerNorm*acLayerSize);
+vec4 gmSource=texture2DCv(inputImg.texture,acLayerNorm);
+float gmAlpha=gmClip?gmSource.a:gmGenerated.a;
+vec4 gmResult=vec4(gmGenerated.rgb*gmAlpha,gmAlpha);
+gl_FragColor=mix(gmSource,gmResult,gmMix);
+}]]></shader>
+</effect>

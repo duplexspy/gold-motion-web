@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.blend.darken" name="Blend/Darken" internal="true">
+<params>
+<texture id="inputImg" srcType="content" />
+<texture id="comp" srcType="comp" />
+</params>
+<shader type="fragment" precision="high"><![CDATA[void main() {
+vec4 texColor = texture2DCv(inputImg.texture,acScreenNorm);
+vec4 compColor = texture2DCv(comp.texture,acScreenNorm);
+vec3 top = texColor.rgb;
+vec3 bot = compColor.rgb * texColor.a;
+vec3 result = min(top,bot);
+gl_FragColor = vec4(result,texColor.a);
+}]]></shader>
+</effect>

@@ -1,0 +1,56 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.pixelwave" name="Pixel Wave" desc="Creates a dynamic pixelated wave effect with customizable parameters" category="procedural" tags="procedural,pixel,wave,distortion" thumb="thumb/SKEXNXX/pixelwave.webp">
+<params>
+<texture id="inputImg" srcType="content" />
+<texture id="comp" srcType="comp" />
+<spinner id="frequency" default="5.0" min="0.1" max="50.0" step="0.1" label="Frequency" />
+<spinner id="amplitude" default="10.0" min="0.0" max="50.0" step="0.1" label="Amplitude" />
+<spinner id="speed" default="1.0" min="0.0" max="10.0" step="0.1" label="Speed" />
+<spinner id="pixelSize" default="10.0" min="1.0" max="50.0" step="1.0" label="Pixel Size" />
+<point id="direction" default="1.0,1.0" label="Direction" />
+<color id="tintColor" default="#FFFFFF80" label="Tint Color" alpha="true" />
+<spinner id="alpha" default="1.0" min="0.0" max="1.0" step="0.01" label="Alpha" type="percent"/>
+<selector id="blendMode" style="dropdown" default="0" label="Blend Mode">
+<choice label="Normal" value="0" />
+<choice label="Multiply" value="1" />
+<choice label="Screen" value="2" />
+<choice label="Overlay" value="3" />
+</selector>
+</params>
+<shader type="fragment" precision="high"><![CDATA[vec2 pixelate(vec2 uv, float pixelSize) {
+return floor(uv * pixelSize) / pixelSize;
+}
+float wave(vec2 uv, float freq, float amp, float time, vec2 dir) {
+float x = uv.x * dir.x + uv.y * dir.y;
+return sin(x * freq + time) * amp;
+}
+vec3 blendOverlay(vec3 base, vec3 blend) {
+return mix(
+2.0 * base * blend,
+1.0 - 2.0 * (1.0 - base) * (1.0 - blend),
+step(0.5, base)
+);
+}
+void main() {
+vec2 dir = normalize(direction);
+float time = acTime * speed;
+vec2 uv = acScreenNorm;
+vec2 pixelUV = pixelate(uv, pixelSize);
+float offset = wave(pixelUV, frequency, amplitude / 1000.0, time, dir);
+vec2 distortedUV = uv + vec2(offset * dir.y, -offset * dir.x);
+vec4 texColor = texture2DCv(inputImg.texture, distortedUV);
+vec4 compColor = texture2DCv(comp.texture, distortedUV);
+vec3 tinted = texColor.rgb * tintColor.rgb;
+vec3 result;
+if (blendMode == 0) {
+result = mix(texColor.rgb, tinted, tintColor.a);
+} else if (blendMode == 1) {
+result = texColor.rgb * mix(vec3(1.0), tintColor.rgb, tintColor.a);
+} else if (blendMode == 2) {
+result = 1.0 - (1.0 - texColor.rgb) * (1.0 - mix(vec3(0.0), tintColor.rgb, tintColor.a));
+} else {
+result = mix(texColor.rgb, blendOverlay(texColor.rgb, tintColor.rgb), tintColor.a);
+}
+gl_FragColor = mix(texColor, vec4(result, texColor.a), alpha);
+}]]></shader>
+</effect>

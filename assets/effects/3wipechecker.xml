@@ -1,0 +1,72 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.wipe_checker"
+name="Wipe Checker"
+desc="Checkerboard wipe using rotated squares (diamonds). Transparent by default; optional fill color if desired."
+category="transition"
+tags="wipe,checker,grid,transition"
+thumb="thumb/wipechecker.webp"
+overdraw="true" max-overdraw="0.10">
+<params>
+<texture id="inputImg" srcType="content" />
+<section text="Wipe" />
+<spinner id="wipe_percent" default="72.0" min="0.0" max="100.0" step="0.1" label="Wipe Percent" type="percent" />
+<selector id="mode" style="dropdown" default="1" label="Checkers">
+<choice label="Grow" value="1" />
+<choice label="Shrink" value="2" />
+</selector>
+<spinner id="edge_softness" default="0.00" min="0.0" max="0.20" step="0.001" label="Edge Softness" />
+<section text="Grid" />
+<spinner id="angle" default="-45.0" min="-180.0" max="180.0" step="0.01" label="Angle (deg)" />
+<spinner id="frequency" default="6.0" min="1.0" max="40.0" step="0.01" label="Frequency" />
+<spinner id="rel_width" default="1.0" min="0.2" max="3.0" step="0.01" label="Rel Width" />
+<spinner id="rel_width_pre" default="1.0" min="0.2" max="3.0" step="0.01" label="Rel Wid Pre Rot" />
+<spinner id="shift_x" default="960.0" min="-4000.0" max="4000.0" step="1.0" label="Shift X (px)" />
+<spinner id="shift_y" default="540.0" min="-4000.0" max="4000.0" step="1.0" label="Shift Y (px)" />
+<section text="Gradient" />
+<spinner id="grad_add" default="0.0" min="-1.0" max="1.0" step="0.01" label="Grad Add" />
+<spinner id="grad_angle" default="0.0" min="0.0" max="360.0" step="0.01" label="Grad Angle" />
+<spinner id="size_grad" default="0.25" min="0.0" max="1.0" step="0.01" label="Size Gradient" />
+<section text="Fill" />
+<color id="fill_color" default="#000000" label="Unrevealed Fill Color" />
+<spinner id="fill_alpha" default="0.0" min="0.0" max="1.0" step="0.01" label="Unrevealed Fill Opacity" type="percent" />
+</params>
+<passes>
+<pass />
+</passes>
+<shader type="fragment" precision="high"><![CDATA[mat2 rot(float a){ float c=cos(a), s=sin(a); return mat2(c,-s,s,c); }
+void main(){
+vec2 uv = acScreenNorm;
+vec2 shiftUV = vec2(shift_x / max(acScreenSize.x,1.0), shift_y / max(acScreenSize.y,1.0));
+uv += shiftUV;
+float ang = radians(angle);
+float freq = max(frequency, 0.0001);
+vec2 preScale = vec2(rel_width_pre, 1.0);
+vec2 p = uv * preScale;
+p = rot(ang) * p;
+vec2 postScale = vec2(rel_width, 1.0);
+p *= postScale;
+vec2 g = p * freq;
+vec2 f = fract(g) - 0.5;
+float d = max(abs(f.x), abs(f.y));
+float s = clamp(wipe_percent/100.0, 0.0, 1.0) * 0.5;
+if (float(mode) > 1.5) {
+s = 0.5 - s;
+}
+float es = max(edge_softness, 0.0);
+float gAng = radians(grad_angle);
+vec2 gdir = normalize(vec2(cos(gAng), sin(gAng)));
+float grad = dot(uv - 0.5, gdir) * (1.0 / 0.7071067811865476);
+float sBias = s + grad_add * grad;
+vec2 res = acScreenSize;
+vec2 uvC = (acScreenNorm * res - 0.5 * res) / min(res.x, res.y);
+float rad = clamp(length(uvC) * 2.0, 0.0, 1.0);
+float sRadial = (rad - 0.5) * 2.0 * size_grad;
+float sAll = sBias + sRadial;
+float t = d - sAll;
+float inside = 1.0 - smoothstep(-es, es, t);
+vec4 src = texture2DCv(inputImg.texture, acScreenNorm);
+vec4 revealed = vec4(src.rgb * src.a, src.a) * inside;
+vec4 fill = vec4(fill_color.rgb * fill_alpha, fill_alpha) * (1.0 - inside);
+gl_FragColor = revealed + fill;
+}]]></shader>
+</effect>

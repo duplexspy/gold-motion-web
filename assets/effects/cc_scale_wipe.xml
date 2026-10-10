@@ -1,0 +1,50 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect
+id="com.alightcreative.effects.ccscalewipe"
+name="smear"
+desc="Stretches the image from a start point towards an end point with a radial falloff."
+category="distort"
+tags="wipe,stretch,distort,shadertoy"
+thumb="thumb/smear.webp">
+<params>
+<texture id="inputImg" srcType="content" />
+<point id="startPoint" label="Start" default="500,500" />
+<point id="endPoint" label="End" default="1000,500" />
+<spinner id="strength" label="Strength" default="1.00" min="0.0" max="10.0" step="0.01" />
+<spinner id="radius" label="Radius" default="0.10" min="0.0" max="1.0" step="0.005" />
+<switch id="keepEdge" label="Keep Edge" default="false" />
+</params>
+<shader type="fragment" precision="high"><![CDATA[precision highp float;
+void main() {
+vec2 uv = acScreenNorm;
+float aspect = acScreenSize.x / acScreenSize.y;
+vec2 aspectUV = uv * vec2(aspect, 1.0);
+vec2 center = (startPoint / 1000.0) * vec2(aspect, 1.0);
+vec2 end = (endPoint / 1000.0) * vec2(aspect, 1.0);
+float stretchStrength = strength * 3.0;
+vec2 dirVec = end - center;
+vec2 dir = normalize(dirVec);
+float projection = dot(aspectUV - center, dir);
+float dist = length(aspectUV - center);
+float mask = smoothstep(radius, 0.0, dist);
+vec2 distortedUV = uv;
+if (projection > 0.0) {
+float amount = (stretchStrength / (1.0 + stretchStrength)) * mask;
+vec2 deltaDistort = dir * projection * amount;
+deltaDistort.x /= aspect;
+distortedUV -= deltaDistort;
+}
+vec4 col = texture2DCv(inputImg.texture, distortedUV);
+if (!keepEdge) {
+if (distortedUV.x > 1.0 || distortedUV.x < 0.0 || distortedUV.y > 1.0 || distortedUV.y < 0.0) {
+col = vec4(0.0);
+}
+} else {
+col = texture2DCv(inputImg.texture, clamp(distortedUV, 0.0, 1.0));
+}
+gl_FragColor = col;
+}]]></shader>
+<passes>
+<pass />
+</passes>
+</effect>

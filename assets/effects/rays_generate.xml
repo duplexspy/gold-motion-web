@@ -1,0 +1,43 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<effect id="com.alightcreative.effects.rays_generate" name="Rays Generate" category="blur" tags="rays,streaks" internal="true">
+<params>
+<texture id="inputImg" srcType="comp" />
+<spinner id="angle" default="35.0" min="-3600" max="3600" step="0.5" type="angle" label="Angle" />
+<spinner id="count" default="12.0" min="1.0" max="16.0" step="1.0" label="Count" />
+<spinner id="length" default="500.0" min="10.0" max="1000.0" step="1.0" label="Length (px)" />
+<spinner id="decay" default="0.008" min="0.000" max="0.100" step="0.001" label="Decay" />
+<spinner id="spread" default="0.75" min="0.0" max="1.0" step="0.01" label="Spread" />
+<spinner id="jitter" default="0.10" min="0.0" max="2.0" step="0.01" label="Jitter" />
+<spinner id="soft" default="3.0" min="0.0" max="20.0" step="0.5" label="Soft (px)" />
+</params>
+<shader type="fragment" precision="high"><![CDATA[vec4 s(vec2 uv){ return texture2DCv(inputImg.texture, uv); }
+float rnd(vec2 p){ return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453); }
+vec4 blur(vec2 uv, float r){ if(r<=0.0) return s(uv); vec2 px=1.0/acScreenSize; vec4 c=s(uv)*4.0; c+=s(uv+vec2(px.x,0.0))*2.0; c+=s(uv-vec2(px.x,0.0))*2.0; c+=s(uv+vec2(0.0,px.y))*2.0; c+=s(uv-vec2(0.0,px.y))*2.0; c+=s(uv+vec2(px.x,px.y)); c+=s(uv+vec2(-px.x,px.y)); c+=s(uv+vec2(px.x,-px.y)); c+=s(uv+vec2(-px.x,-px.y)); return c/14.0; }
+void main(){
+vec2 uv = acScreenNorm;
+vec2 px = 1.0/acScreenSize;
+float baseAng = radians(angle);
+int ic = int(count+0.5);
+float seg = 3.14159265359 * 2.0 / max(1.0, float(ic));
+vec4 acc = vec4(0.0);
+for(int k=0;k<16;k++){
+if(k>=ic) break;
+float a = baseAng + seg*float(k);
+vec2 dir = vec2(cos(a), sin(a));
+float len = length;
+int steps = int(min(256.0, len));
+float stepScale = spread;
+for(int i=0;i<64;i++){
+if(i>=steps) break;
+float fi = float(i);
+float w = exp(-decay*fi);
+float j = (rnd(uv.xy+fi) - 0.5) * jitter;
+vec2 offs = (-dir * fi * stepScale + dir * j) * px;
+vec2 p = uv + offs;
+acc += blur(p, soft) * w;
+}
+}
+vec4 rays = acc;
+gl_FragColor = vec4(rays.rgb, clamp(rays.a,0.0,1.0));
+}]]></shader>
+</effect>

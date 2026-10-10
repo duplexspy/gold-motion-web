@@ -1,0 +1,109 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<effect id="com.alightcreative.effects.drop_shadow" name="S_drop Shadow" desc="Generates a smooth Gaussian drop shadow from the layer alpha and composites it behind the foreground" category="light" tags="shadow,drop,soft,blur,composite,lighting" thumb="thumb/dropshadd.webp">
+<params>
+<texture id="inputImg" srcType="content" />
+<texture id="bufferA" srcType="buffer" downsample="2" />
+<texture id="bufferB" srcType="buffer" downsample="2" />
+<texture id="bufferC" srcType="buffer" downsample="2" />
+<section text="Shadow" />
+<color id="shadowColor" default="#000000" label="Shadow Color" />
+<spinner id="shadowOpacity" default="1.0" min="0.0" max="3.0" step="0.01" label="Shadow Opacity" />
+<spinner id="shadowBlur" default="0.1" min="0.0" max="2.0" step="0.005" label="Shadow Blur" />
+<section text="Shadow Offset" />
+<spinner id="shiftX" default="0.042" min="-1.0" max="1.0" step="0.001" label="Shift X" />
+<spinner id="shiftY" default="-0.042" min="-1.0" max="1.0" step="0.001" label="Shift Y" />
+<section text="Foreground" />
+<spinner id="fgOpacity" default="1.0" min="0.0" max="1.0" step="0.01" label="Fg Opacity" />
+<section text="Matte" />
+<selector id="matteUse" style="dropdown" default="0" label="Matte Use">
+<choice label="Alpha" value="0" />
+<choice label="Luma" value="1" />
+</selector>
+<selector id="invertMatte" style="dropdown" default="0" label="Invert Matte">
+<choice label="Off" value="0" />
+<choice label="On" value="1" />
+</selector>
+</params>
+<passes>
+<pass target="bufferA" />
+<pass target="bufferB" />
+<pass target="bufferC" />
+<pass />
+</passes>
+<shader type="fragment" precision="medium"><![CDATA[const float PI = 3.14159265;
+float getMatte(vec4 col) {
+float mv;
+if (matteUse == 1) {
+mv = dot(col.rgb, vec3(0.299, 0.587, 0.114));
+} else {
+mv = col.a;
+}
+if (invertMatte == 1) mv = 1.0 - mv;
+return clamp(mv, 0.0, 1.0);
+}
+vec4 gaussianBlur(sampler2D tex, vec2 uv, vec2 texOffset, float kernelSize) {
+if (kernelSize <= 0.0) return texture2DCv(tex, uv);
+float adjSigma = kernelSize / 2.14596602;
+vec3 ig;
+ig.x = 1.0 / (sqrt(2.0 * PI) * adjSigma);
+ig.y = exp(-0.5 / (adjSigma * adjSigma));
+ig.z = ig.y * ig.y;
+vec4 avgValue = texture2DCv(tex, uv) * ig.x;
+float coeffSum = ig.x;
+for (float i = 1.0; i <= kernelSize; i += 2.0) {
+float offset0 = i;
+float offset1 = i + 1.0;
+ig.xy *= ig.yz;
+coeffSum += 2.0 * ig.x;
+float w0 = ig.x;
+ig.xy *= ig.yz;
+coeffSum += 2.0 * ig.x;
+float w1 = ig.x;
+float wL = w0 + w1;
+float oL = (offset0 * w0 + offset1 * w1) / wL;
+avgValue += texture2DCv(tex, uv - oL * texOffset) * wL;
+avgValue += texture2DCv(tex, uv + oL * texOffset) * wL;
+}
+return avgValue / coeffSum;
+}
+void pass0() {
+vec2 uv = acScreenNorm - vec2(shiftX, shiftY);
+vec4 src = texture2DCv(inputImg.texture, uv);
+float m = getMatte(src);
+gl_FragColor = vec4(m, m, m, m);
+}
+void pass1() {
+vec2 uv = acScreenNorm;
+float kernelSize = shadowBlur / 2.0 * 1.14 / 4.0 / 3.0 * length(acPreviewSize);
+vec2 texOffset = vec2(1.0 / bufferA.size.x, 0.0);
+gl_FragColor = gaussianBlur(bufferA.texture, uv, texOffset, kernelSize);
+}
+void pass2() {
+vec2 uv = acScreenNorm;
+float kernelSize = shadowBlur / 2.0 * 1.14 / 4.0 / 3.0 * length(acPreviewSize);
+vec2 texOffset = vec2(0.0, 1.0 / bufferB.size.y);
+gl_FragColor = gaussianBlur(bufferB.texture, uv, texOffset, kernelSize);
+}
+void pass3() {
+vec2 uv = acScreenNorm;
+float blurredMatte = texture2DCv(bufferC.texture, uv).r;
+float shadowMatte = clamp(blurredMatte * shadowOpacity, 0.0, 1.0);
+vec4 shadow = vec4(shadowColor.rgb * shadowMatte, shadowMatte);
+vec4 fg = texture2DCv(inputImg.texture, uv);
+float fgA = getMatte(fg) * fgOpacity;
+vec3 rgb = shadow.rgb * (1.0 - fgA) + fg.rgb * fgA;
+float a   = shadow.a + fgA * (1.0 - shadow.a);
+gl_FragColor = vec4(rgb, a);
+}
+void main() {
+if (acPass == 0) {
+pass0();
+} else if (acPass == 1) {
+pass1();
+} else if (acPass == 2) {
+pass2();
+} else {
+pass3();
+}
+}]]></shader>
+</effect>

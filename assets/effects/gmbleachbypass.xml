@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect id="com.gmfx.effects.bleachbypass" name="GM Bleach Bypass" desc="Silver-retention film process with crushed contrast and desaturated punch" category="color" tags="bleach,bypass,film,silver,gritty,cinematic" overdraw="false" thumb="thumb/gm/gmbleachbypass.webp">
+<params>
+<texture id="inputImg" srcType="content"/>
+<section text="PROCESS"/>
+<spinner id="strength" default="100.0" min="0.0" max="100.0" step="1.0" label="Strength" type="percent"/>
+<spinner id="silverSat" default="0.25" min="0.0" max="1.0" step="0.01" label="Silver Saturation" type="percent"/>
+<spinner id="crushContrast" default="1.25" min="0.5" max="2.5" step="0.01" label="Contrast"/>
+<spinner id="exposureBB" default="0.0" min="-1.0" max="1.0" step="0.01" label="Exposure"/>
+<section text="FINISH"/>
+<spinner id="shadowTintAmt" default="0.3" min="0.0" max="1.0" step="0.01" label="Cool Shadows" type="percent"/>
+<spinner id="grainBB" default="0.12" min="0.0" max="0.5" step="0.01" label="Grain" type="percent"/>
+</params>
+<shader type="fragment" precision="high"><![CDATA[float gmLum(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+float gmHash2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+void main(){
+vec2 uv = acScreenNorm;
+vec4 src = texture2DCv(inputImg.texture, uv);
+vec3 c = clamp(src.rgb * pow(2.0, exposureBB), 0.0, 4.0);
+float l = gmLum(c);
+float silver = clamp((l - 0.5) * crushContrast + 0.5, 0.0, 1.0);
+silver = silver * silver * (3.0 - 2.0 * silver);
+vec3 silverCol = vec3(silver);
+vec3 sat = mix(vec3(l), c, silverSat);
+vec3 over = mix(2.0 * sat * silverCol, 1.0 - 2.0 * (1.0 - sat) * (1.0 - silverCol), step(0.5, silverCol));
+over = clamp(over, 0.0, 1.0);
+float shadowW = 1.0 - smoothstep(0.0, 0.55, l);
+over *= mix(vec3(1.0), vec3(0.93, 0.97, 1.06), shadowW * shadowTintAmt);
+float g = gmHash2(uv * getTexSize(inputImg.size) + fract(acTime) * 37.1);
+over += (g - 0.5) * grainBB * 0.35;
+vec3 col = mix(src.rgb, over, strength * 0.01);
+gl_FragColor = vec4(col * src.a, src.a);
+}]]></shader>
+</effect>
